@@ -1,5 +1,16 @@
 # Changelog
 
+## v3.1.4（26.3 Fabric 版：聊天面板打开时音乐横幅回到面板下方）
+
+> 与 `main` 分支同源改动，详细说明见 `main` 分支 CHANGELOG。
+
+**修复**
+- **音乐横幅浮在聊天面板之上**：26.x 里它此前走 `ScreenEvents.afterExtract`（屏内层）绘制，于是盖在面板上面。现改为在 HUD 层绘制 —— `Gui.extractRenderState` 的提取顺序是 hud → overlay → screen，HUD 层画的内容天然落在面板**下方**、被面板盖住（与 1.21.11 一致）；`renderBannerForScreen` 只保留 @ 提醒横幅（`withMusicIsland=false`），避免同一胶囊既在面板下又在面板上
+
+**其它**
+- 设置项 `灵动岛显示音乐` 改名为 **`音乐横幅`**（英文 `Music banner`）
+- 版本号 3.1.3 → 3.1.4；配置键与协议与 3.1.3 一致
+
 ## v3.1.3（26.3 Fabric 版：音乐岛 / @ 横幅避让原版 Boss 血条）
 
 > 与 `main` 分支同源改动，详细说明见 `main` 分支 CHANGELOG。

@@ -1,7 +1,7 @@
 # E33Chat · Minecraft 26.3 Fabric 版
 
 > **本分支：`mc26.3` · Minecraft 26.3（26.x 移植线）**
-> 产物：**`e33chat-Fabric-26.3-3.1.3.jar`**（690,676 字节 / ≈674 KiB） · 模组版本 **3.1.3**
+> 产物：**`e33chat-Fabric-26.3-3.1.4.jar`**（690,787 字节 / ≈675 KiB） · 模组版本 **3.1.4**
 > 仓库：[kimifuto2/e33chat-1.21.11-](https://github.com/kimifuto2/e33chat-1.21.11-) · 上游：[E33EPUS/E33Chat](https://github.com/E33EPUS/E33Chat)（MIT）
 >
 > 在 1.21.11 移植/增强版的基础上，把客户端**移植到 Minecraft 26.3**：功能集与 `main` 分支同源，主要差异在构建链与 26.x 平台 API（见「26.x 移植说明」）。
@@ -10,11 +10,11 @@
 
 三个分支同属一个仓库，产物互不通用 —— 请按自己的游戏版本取对应分支的 jar：
 
-| 分支 | Minecraft | 定位 | 产物 jar（3.1.3） | 大小 |
+| 分支 | Minecraft | 定位 | 产物 jar（3.1.4） | 大小 |
 |---|---|---|---|---|
-| `main` | 1.21.11 | 稳定线 | `e33chat-Fabric-1.21.11-3.1.3.jar` | 686,714 B |
-| **`mc26.3`**（本分支） | 26.3 | 26.x 移植线 | `e33chat-Fabric-26.3-3.1.3.jar` | 690,676 B |
-| `mc26.2` | 26.2 | 26.x 移植线 | `e33chat-Fabric-26.2-3.1.3.jar` | 690,639 B |
+| `main` | 1.21.11 | 稳定线 | `e33chat-Fabric-1.21.11-3.1.4.jar` | 686,705 B |
+| **`mc26.3`**（本分支） | 26.3 | 26.x 移植线 | `e33chat-Fabric-26.3-3.1.4.jar` | 690,787 B |
+| `mc26.2` | 26.2 | 26.x 移植线 | `e33chat-Fabric-26.2-3.1.4.jar` | 690,750 B |
 
 > 三个分支都在 **<https://github.com/kimifuto2/e33chat-1.21.11->** 下。**26.x 移植线**指 Mojang 改用年份版本号之后的版本，构建链与 1.21.11 差异很大（Java 25 / Gradle 9.8+ / Loom 1.19.3 / **不再混淆**）；`mc26.2` 与本分支环境基本相同，只有 Minecraft / Fabric API / 输入体系（GLFW vs SDL）不同（见「26.x 移植说明」最后一节）。
 
@@ -49,7 +49,7 @@
 
 1. 建一个 **Minecraft 26.3 + Fabric Loader 0.20.1** 的实例；
 2. 把 **Fabric API `0.165.0+26.3`** 放进实例的 `mods/`；
-3. 把 **`e33chat-Fabric-26.3-3.1.3.jar`** 放进**同一个**实例的 `mods/` 目录；
+3. 把 **`e33chat-Fabric-26.3-3.1.4.jar`** 放进**同一个**实例的 `mods/` 目录；
 4. （可选）装 **Mod Menu `19.0.0-alpha.1`**，即可获得图形化配置入口；
 5. 启动游戏后聊天栏就是本模组的聊天界面，配置界面在 **Mod Menu → E33Chat → 配置**。
 
@@ -59,7 +59,7 @@
 
 | 服务端类型 | 装什么 | 效果 |
 |---|---|---|
-| Fabric 服务端 **26.3** | 本分支的 `e33chat-Fabric-26.3-3.1.3.jar` | 消息元数据 / 引用精确跳转 / @提及同步全部可用 |
+| Fabric 服务端 **26.3** | 本分支的 `e33chat-Fabric-26.3-3.1.4.jar` | 消息元数据 / 引用精确跳转 / @提及同步全部可用 |
 | Paper **26.3**（服务端需 Java 25） | `paper-plugin/` 构建出的 `E33ChatPaper-26.3-3.0.1.jar`（`paper-api` `26.3.build.222-stable`，`api-version: '26.3'`） | 线协议与客户端一致；已在 **Paper 26.3 build 222** 真机加载通过 |
 
 ---
@@ -150,7 +150,7 @@ dependencies {
 
 ## 3.0.x 版本说明（相对上游 2.4.2）
 
-当前版本 **3.1.3**（3.1.1 移除了灵动岛音乐胶囊的进度条；3.1.2 修复群聊二级界面输入框文字未垂直居中；3.1.3 让音乐岛与 @ 横幅避让原版 Boss 血条）。相对上游 2.4.2，本版除完成 1.21.11 → 26.3 的移植外，还包含以下增强：
+当前版本 **3.1.4**（3.1.1 移除了灵动岛音乐胶囊的进度条；3.1.2 修复群聊二级界面输入框文字未垂直居中；3.1.3 让音乐岛与 @ 横幅避让原版 Boss 血条；3.1.4 让音乐横幅在聊天面板打开时回到面板下方，并把它在设置里的名字改为「音乐横幅」）。相对上游 2.4.2，本版除完成 1.21.11 → 26.3 的移植外，还包含以下增强：
 
 | 类别 | 内容 |
 |---|---|
@@ -208,7 +208,7 @@ dependencies {
 - **灵动岛 × DangoMusic 联动**（可选）
   - 与 **DangoMusic（3D 歌词音乐模组）** 同时安装时，顶部灵动岛显示「封面 + 曲名 + 艺术家 + 播放时间（`1:26 / 3:35`）」（3.1.1 起不再画进度条；3.1.3 起屏上有 Boss 血条时自动下压到血条下方）
   - **播放中常驻**、**暂停约 1.5 秒后淡出**（与 @ 通知横幅同一动画时长）
-  - 可在 **设置 → 「横幅」分组 → 「灵动岛显示音乐」** 关闭（默认开）
+  - 可在 **设置 → 「横幅」分组 → 「音乐横幅」** 关闭（默认开）
   - **未装 DangoMusic 时行为完全不变**；不为其自带的灵动岛让位（如需可关闭 DangoMusic 自带的岛）
 
 ### 兼容与稳定性
@@ -287,7 +287,7 @@ java.lang.IllegalStateException: Cannot register channel. Too many channel regis
 | `publicOverlayIdleSeconds` | 小窗静默淡出秒数（1~60） |
 | `redDotEnabled` | 左下角聊天图标红点 |
 | `mentionBannerEnabled` / `systemBannerEnabled` | 灵动岛横幅开关 |
-| `musicIslandEnabled` | 灵动岛显示音乐（需装 DangoMusic，默认开） |
+| `musicIslandEnabled` | 音乐横幅（需装 DangoMusic，默认开） |
 
 ---
 
@@ -302,8 +302,8 @@ gradle build
 
 | 文件 | 大小 |
 |---|---|
-| `build/libs/e33chat-Fabric-26.3-3.1.3.jar` | 690,676 B |
-| `build/libs/e33chat-Fabric-26.3-3.1.3-sources.jar` | 484,838 B |
+| `build/libs/e33chat-Fabric-26.3-3.1.4.jar` | 690,787 B |
+| `build/libs/e33chat-Fabric-26.3-3.1.4-sources.jar` | 485,136 B |
 
 ---
 
