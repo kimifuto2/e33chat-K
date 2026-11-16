@@ -9,6 +9,7 @@ import com.niuqu.chatbubble.render.Appearance;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.niuqu.chatbubble.chat.notification.MentionNotificationBanner;
+import com.niuqu.chatbubble.chat.notification.MusicIslandBanner;
 import com.niuqu.chatbubble.config.ChatBubbleConfig;
 import java.util.List;
 import net.minecraft.client.Minecraft;
@@ -48,8 +49,16 @@ public class ChatBubbleHudOverlay {
         g.getMatrices().translate(0, 0);
 
         MentionNotificationBanner.INSTANCE.tick();
+        boolean chatPanelOpen = mc.gui.screen() instanceof ChatBubbleScreen;
         if (mc.gui.screen() == null) {
             MentionNotificationBanner.INSTANCE.render(g,
+                mc.getWindow().getGuiScaledWidth(),
+                mc.getWindow().getGuiScaledHeight());
+        } else if (chatPanelOpen) {
+            // 聊天面板打开时：常驻音乐横幅画在 HUD 层。Gui.extractRenderState 里先提取
+            // hud、后提取 screen，所以 HUD 层的画在面板**下方**、被面板盖住（与 1.21.11 一致）；
+            // 不能再走 ScreenEvents.afterExtract 那条路径，那会浮到面板之上。
+            MusicIslandBanner.INSTANCE.render(g,
                 mc.getWindow().getGuiScaledWidth(),
                 mc.getWindow().getGuiScaledHeight());
         }
@@ -92,9 +101,10 @@ public class ChatBubbleHudOverlay {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.options == null) return;
         if (mc.gui.screen() instanceof ChatBubbleScreen) {
+            // 只画 @ 横幅：音乐横幅已由 HUD 层画在面板下方，这里再画一遍就会浮到面板之上
             MentionNotificationBanner.INSTANCE.render(g,
                 mc.getWindow().getGuiScaledWidth(),
-                mc.getWindow().getGuiScaledHeight());
+                mc.getWindow().getGuiScaledHeight(), false);
         }
     }
 
