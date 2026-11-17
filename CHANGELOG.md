@@ -1,5 +1,13 @@
 # Changelog
 
+## v3.1.5（1.21.11 Fabric 版：恢复命令用法提示）
+
+**修复**
+- **命令用法提示行不显示**：`ChatInputSuggestorMixin` 此前把 `ChatInputSuggestor.renderMessages`（原版画「命令用法 / 报错」提示行的入口）整个 cancel，导致本屏只有候选列表、没有用法提示。现已删掉该 cancel —— 候选列表（`ChatInputSuggestor.render → tryRenderWindow`）与用法提示都恢复原版行为，候选列表位置仍由 mixin 调整到输入框正上方
+
+**其它**
+- 版本号 3.1.4 → 3.1.5；协议、配置键与语言文件与 3.1.4 一致
+
 ## v3.1.4（1.21.11 Fabric 版：设置项改名「音乐横幅」）
 
 **其它**
