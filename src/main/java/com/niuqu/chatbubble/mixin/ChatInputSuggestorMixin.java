@@ -2,7 +2,6 @@ package com.niuqu.chatbubble.mixin;
 
 import com.niuqu.chatbubble.ChatBubbleScreen;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.ChatInputSuggestor;
 import net.minecraft.client.util.math.Rect2i;
 import org.spongepowered.asm.mixin.Mixin;
@@ -13,12 +12,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(value = ChatInputSuggestor.class, priority = 500)
 public class ChatInputSuggestorMixin {
 
-    @Inject(method = "renderMessages", at = @At("HEAD"), cancellable = true)
-    private void onRenderMessages(DrawContext context, CallbackInfo ci) {
-        if (MinecraftClient.getInstance().currentScreen instanceof ChatBubbleScreen) {
-            ci.cancel();
-        }
-    }
+    // 不再取消 renderMessages（原版的「命令用法 / 报错」提示行），
+    // 否则本屏只剩候选窗口、没有用法提示。
 
     @Inject(method = "show(Z)V", at = @At("TAIL"))
     private void afterShow(CallbackInfo ci) {
