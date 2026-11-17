@@ -1,5 +1,15 @@
 # Changelog
 
+## v3.1.5（26.2 Fabric 版：恢复指令候选列表）
+
+> 与 `main` 分支同源改动，详细说明见 `main` 分支 CHANGELOG。
+
+**修复**
+- **指令候选列表不显示**：`ChatInputSuggestorMixin` 此前把 `CommandSuggestions.extractRenderState` 整个 cancel，而聊天面板正是手动调用它来画候选列表 —— 结果输入框里的灰色补全正常、上方的候选框（`/time set minecraft:` 的 day/midnight/night/noon）永远不出现。删掉该 cancel 后候选框恢复显示，位置仍贴在输入框正上方
+
+**其它**
+- 版本号 3.1.4 → 3.1.5；协议、配置键与 3.1.4 一致
+
 ## v3.1.4（26.2 Fabric 版：聊天面板打开时音乐横幅回到面板下方）
 
 > 与 `main` 分支同源改动，详细说明见 `main` 分支 CHANGELOG。
