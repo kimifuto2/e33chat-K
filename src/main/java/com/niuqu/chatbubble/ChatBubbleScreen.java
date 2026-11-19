@@ -4484,9 +4484,10 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
                 setFocused(input);
                 break;
             case 2: { // theme
-                ChatBubbleTheme next = theme() == ChatBubbleTheme.DARK ? ChatBubbleTheme.LIGHT : ChatBubbleTheme.DARK;
-                ChatBubbleClientSetup.saveConfig(ChatBubbleClientSetup.config().withTheme(next.name().toLowerCase()));
-                        int editColor = next == ChatBubbleTheme.LIGHT ? c().textSecondary() : c().textPrimary();
+                com.niuqu.chatbubble.render.ThemePreset next = com.niuqu.chatbubble.render.ThemePreset.current().next();
+                ChatBubbleClientSetup.saveConfig(ChatBubbleClientSetup.config().withTheme(next.key()));
+                boolean light = next.mode() == ChatBubbleTheme.ColorMode.LIGHT;
+                int editColor = light ? c().textSecondary() : c().textPrimary();
                 input.setTextColor(editColor);
                 input.setTextColorUneditable(c().textMuted());
                 sidebarSearchBox.setTextColor(editColor);
@@ -4495,7 +4496,7 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
                 quickChatInput.setTextColorUneditable(c().textMuted());
                 searchInput.setTextColor(editColor);
                 searchInput.setTextColorUneditable(c().textMuted());
-                int cmdAlpha = next == ChatBubbleTheme.LIGHT ? 0x99 : 0xDD;
+                int cmdAlpha = light ? 0x99 : 0xDD;
                 commandSuggestions = new CommandSuggestions(minecraft, this, input, font,
                     false, false, 0, 8, true, ChatBubbleTheme.alphaBlend(c().panelBg(), cmdAlpha));
                 commandSuggestions.setAllowSuggestions(true);
