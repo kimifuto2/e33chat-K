@@ -34,6 +34,12 @@ public class MinecraftClientMixin {
 
         if (screen instanceof InBedChatScreen) {
             ci.cancel();
+            if (BedScreen.isSuppressed()) {
+                // 刚点过「起床」（或睡觉时关掉了聊天）：起床包还没生效，原版每 tick 都会尝试
+                // 自动打开床屏 —— 这段短时间内直接不显示，避免床屏闪一下又消失。
+                Minecraft.getInstance().gui.setScreen(null);
+                return;
+            }
             BedScreen.setScreenBeforeSleep(Minecraft.getInstance().gui.screen());
             Minecraft.getInstance().gui.setScreen(new BedScreen());
         } else if (screen instanceof ChatScreen chatScreen

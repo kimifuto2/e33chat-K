@@ -43,6 +43,7 @@ import com.niuqu.chatbubble.ui.ChatEmojiPanel;
 import com.niuqu.chatbubble.ui.ChatQuickChatPanel;
 import com.niuqu.chatbubble.ui.ChatSearchPanel;
 import com.niuqu.chatbubble.ui.ChatSettingsMenu;
+import com.niuqu.chatbubble.ui.BedScreen;
 import com.niuqu.chatbubble.ui.PlayerActionCustomPopup;
 import com.niuqu.chatbubble.ui.PlayerActionMenu;
 import com.niuqu.chatbubble.network.PlayerActionPayload;
@@ -60,6 +61,7 @@ import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.resources.DefaultPlayerSkin;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.network.chat.Style;
@@ -403,6 +405,8 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
     private int notifCountLeft, notifCountRight;
     private int notifMentionLeft = -1, notifMentionRight = -1;
     private int notifBarTextY;
+    /** 打开本屏时玩家正在睡觉（床上聊天屏）：标题栏要多显示一颗「起床」，关闭聊天 = 起床。 */
+    private boolean sleepMode;
 
     public ChatBubbleScreen(String initialText) {
         super("", false);
@@ -417,6 +421,7 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
         animStart = Util.getMillis();
         closing = false;
         firstRender = true;
+        sleepMode = isSleeping();
 
         int physicalW = ChatBubbleClientSetup.config().panelWidth();
         int guiScale = (int) Math.round(minecraft.getWindow().getGuiScale());
@@ -1403,6 +1408,12 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
 
     @Override
     public void tick() {
+        // 睡着时自动打开的聊天屏：玩家醒来后自动关掉（对应原版 InBedChatScreen.onPlayerWokeUp）
+        if (sleepMode && !isSleeping() && minecraft != null && minecraft.gui.screen() == this) {
+            closing = false;
+            minecraft.gui.setScreen(null);
+            return;
+        }
         if (copyToastTicks > 0) copyToastTicks--;
         if (uploadToastTicks > 0) uploadToastTicks--;
         finishPopupClose(settingsCloseStart, () -> { settingsCloseStart = 0; settingsMenu.visible = false; });
@@ -1924,6 +1935,7 @@ if (this.getFocused() != null && this.getFocused().keyPressed(input))
                 }
                 return true;
             }
+            if (isMouseOverLeaveBed(mouseX, mouseY)) { leaveBed(); return true; }
             if (mouseX >= panelX + panelW - 18 && mouseX <= panelX + panelW - 6
                 && mouseY >= titleY + 6 && mouseY <= titleY + 18) { onClose(); return true; }
             // 群聊：关闭键左侧的「设置」按钮 → 群聊设置在聊天面板内以**模态层**打开
@@ -2742,6 +2754,21 @@ boolean selDrag = textSelection.isDragActive();
             getAnimProgress(), isMouseOverDnd(mouseX, mouseY),
             dndActiveForCurrentView());
 
+        // 睡觉时：标题栏常驻「起床」药丸（面板开着也不丢起床入口，见 isSleeping() 注释）。
+        if (sleepMode && isSleeping()) {
+            String bedLabel = Component.translatable("multiplayer.stopSleeping").getString();
+            int bx = leaveBedX(), by = leaveBedY(), bw = leaveBedW(), bh = leaveBedH();
+            int textW = font.width(bedLabel);
+            boolean hoverBed = mouseX >= bx && mouseX <= bx + bw && mouseY >= by && mouseY <= by + bh;
+            RoundRectRenderer.fill(g, bx, by, bx + bw, by + bh, 7f,
+                ChatBubbleTheme.alphaBlend(c().textMuted(), c255));
+            RoundRectRenderer.fill(g, bx + 1, by + 1, bx + bw - 1, by + bh - 1, 6f,
+                ChatBubbleTheme.alphaBlend(hoverBed ? c().popupHover() : c().inputBg(), c255));
+            g.drawText(font, bedLabel, bx + (bw - textW) / 2,
+                by + (bh - font.lineHeight) / 2 + 1,
+                ChatBubbleTheme.alphaBlend(c().textPrimary(), c255), false);
+        }
+
         String title = getDisplayTitle();
         int titleW = font.width(title);
         int titleX = UiLayout.centerX(panelX, panelW, titleW);
@@ -3015,6 +3042,43 @@ boolean selDrag = textSelection.isDragActive();
         int bx = dndButtonX() - 1, by = dndButtonY() - 1;
         int s = ICON_S - 1 + 2;   // 图标尺寸（= 齿轮）+ 两侧各 1px 描边
         return mx >= bx && mx <= bx + s && my >= by && my <= by + s;
+    }
+
+    // ==== 睡眠（床上的聊天屏） ====
+    // 原版睡觉时会显示 InBedChatScreen（聊天屏 + 一颗「起床」按钮），本模组把它换成了
+    // BedScreen。于是「面板打开 → 起床按钮消失、面板关闭 → 起床按钮又弹回来」很割裂。
+    // 现在：睡觉时打开聊天面板，标题栏常驻一颗「起床」药丸；关闭聊天（✕ / ESC）=
+    // 原版 ESC 的语义（起床），不会再弹回 BedScreen 里那颗孤零零的按钮。
+
+    /** 玩家当前是否在睡觉（{@code player} 可能为 null，例如断开连接时）。 */
+    private boolean isSleeping() {
+        return minecraft != null && minecraft.player != null && minecraft.player.isSleeping();
+    }
+
+    /** 标题栏「起床」药丸的左边界：紧跟在免打扰（月亮）按钮右侧。 */
+    private int leaveBedX() { return dndButtonX() + ICON_S - 1 + 8; }
+    private int leaveBedY() { return titleY + (TITLE_H - leaveBedH()) / 2; }
+    private int leaveBedW() {
+        return font.width(Component.translatable("multiplayer.stopSleeping")) + 12;
+    }
+    private int leaveBedH() { return 14; }
+
+    private boolean isMouseOverLeaveBed(double mx, double my) {
+        if (!sleepMode || !isSleeping()) return false;
+        int x = leaveBedX(), y = leaveBedY(), w = leaveBedW(), h = leaveBedH();
+        return mx >= x && mx <= x + w && my >= y && my <= y + h;
+    }
+
+    /** 起床：发 STOP_SLEEPING 并立刻关屏（睡觉时关闭聊天 = 起床，和原版 ESC 一致）。 */
+    private void leaveBed() {
+        if (minecraft == null || minecraft.player == null) return;
+        minecraft.player.connection.send(new ServerboundPlayerCommandPacket(
+            minecraft.player, ServerboundPlayerCommandPacket.Action.STOP_SLEEPING));
+        // 起床包要一个往返才生效，这段时间原版会反复尝试自动打开床屏 —— 临时抑制，
+        // 避免「关掉聊天 → 床屏闪一下」。
+        BedScreen.suppressFor(900);
+        closing = false;
+        if (minecraft.gui.screen() == this) minecraft.gui.setScreen(null);
     }
 
     /** 当前视图下免打扰是否已开启：公屏视图看公屏开关，私聊视图看「这个对象」的开关，
@@ -5293,6 +5357,9 @@ if (cmpLogged < 3 && quoteSenderMatches(m, owner.replySender())) {
 
     public void onClose() {
         if (ChatBubbleClientSetup.config().preserveInput()) savedInput = input.getValue();
+        // 睡觉时关闭聊天 = 起床（原版 ESC 在床上的语义），否则一关屏原版又会把
+        // BedScreen 弹回来，看起来像「关不掉」。
+        if (sleepMode && isSleeping()) { leaveBed(); return; }
         if (!ChatBubbleClientSetup.config().animationEnabled()) {
             minecraft.gui.setScreen(null); return;
         }
