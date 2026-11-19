@@ -2,6 +2,7 @@ package com.niuqu.chatbubble.render;
 import com.niuqu.chatbubble.ChatBubbleClientSetup;
 import com.niuqu.chatbubble.store.ChatMessageStore;
 import com.niuqu.chatbubble.ChatBubbleScreen;
+import com.niuqu.chatbubble.ui.BedScreen;
 import com.niuqu.chatbubble.ChatBubbleMod;
 import com.niuqu.chatbubble.config.ChatBubbleConfig;
 import com.niuqu.chatbubble.render.ChatBubbleTheme;
@@ -62,9 +63,10 @@ public class ChatBubbleHudOverlay {
                 mc.getWindow().getScaledHeight());
         }
 
-        // 睡觉时不画 HUD 的聊天图标/按键提示/公屏小窗：床上的界面由 BedScreen 或
-        // 聊天面板负责，底下再压一个 [T] 提示很割裂
-        if (mc.currentScreen != null || mc.player.isSleeping()) { g.getMatrices().popMatrix(); return; }
+        // 睡觉时（BedScreen）也要显示左下角的聊天图标 / [T] 提示：玩家躺在床上同样需要
+        // 「点这里聊天」的入口；聊天面板打开时依旧隐藏（和平时一致）。
+        boolean sleepingScreen = mc.currentScreen instanceof BedScreen;
+        if (mc.currentScreen != null && !sleepingScreen) { g.getMatrices().popMatrix(); return; }
 
         String keyName = mc.options.chatKey.getBoundKeyLocalizedText().getString();
         int screenH = mc.getWindow().getScaledHeight();
@@ -113,8 +115,7 @@ public class ChatBubbleHudOverlay {
     public static boolean isMouseOverIcon(double mx, double my) {
         if (cfg().hideChatIcon()) return false;
         MinecraftClient mc = MinecraftClient.getInstance();
-        if (mc.currentScreen != null) return false;
-        if (mc.player != null && mc.player.isSleeping()) return false;
+        if (mc.currentScreen != null && !(mc.currentScreen instanceof BedScreen)) return false;
         int screenH = mc.getWindow().getScaledHeight();
         int iconY = screenH - ICON_S - 20;
         return mx >= 3 && mx <= 3 + ICON_S && my >= iconY && my <= iconY + ICON_S + mc.textRenderer.fontHeight + 2;

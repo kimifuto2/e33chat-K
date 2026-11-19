@@ -5341,9 +5341,8 @@ if (cmpLogged < 3 && quoteSenderMatches(m, owner.replySender())) {
 
     public void onClose() {
         if (ChatBubbleClientSetup.config().preserveInput()) savedInput = chatField.getText();
-        // 睡觉时关闭聊天 = 起床（原版 ESC 在床上的语义），否则一关屏原版又会把
-        // BedScreen 弹回来，看起来像「关不掉」。
-        if (sleepMode && isSleeping()) { leaveBed(); return; }
+        // 睡觉时 ESC / ✕ 只关聊天面板（回到床上的界面），**不**起床 —— 起床只走标题栏那颗
+        // 「起床」药丸（用户要求：只有点按钮才起床）。
         if (!ChatBubbleClientSetup.config().animationEnabled()) {
             client.setScreen(null); return;
         }

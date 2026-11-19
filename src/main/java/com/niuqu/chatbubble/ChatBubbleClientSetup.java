@@ -872,7 +872,8 @@ public class ChatBubbleClientSetup implements ClientModInitializer {
             ChatMessageStore.setCurrentWorld(key);
             ChatMessageStore.maybeAutoSave();
 
-            if (client.currentScreen == null) {
+            // 睡觉时（BedScreen）左下角同样画着聊天图标，所以这里也要接受点击
+            if (client.currentScreen == null || client.currentScreen instanceof com.niuqu.chatbubble.ui.BedScreen) {
                 boolean leftDown = org.lwjgl.glfw.GLFW.glfwGetMouseButton(
                     client.getWindow().getHandle(), org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_1) == org.lwjgl.glfw.GLFW.GLFW_PRESS;
                 if (leftDown && !leftWasDown) {
