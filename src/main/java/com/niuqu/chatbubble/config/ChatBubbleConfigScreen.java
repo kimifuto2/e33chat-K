@@ -6,6 +6,7 @@ import com.niuqu.chatbubble.channeldiet.ChannelDietFilter;
 import com.niuqu.chatbubble.store.ChatMessageStore;
 import com.niuqu.chatbubble.render.Appearance;
 import com.niuqu.chatbubble.render.ChatBubbleTheme;
+import com.niuqu.chatbubble.render.ThemePreset;
 import com.niuqu.chatbubble.render.AnimationStyle;
 import com.niuqu.chatbubble.render.RoundRectRenderer;
 import it.unimi.dsi.fastutil.booleans.BooleanConsumer;
@@ -33,14 +34,16 @@ public class ChatBubbleConfigScreen extends Screen {
     private final Screen lastScreen;
 
     private ChatBubbleTheme.Colors c() {
-        ChatBubbleTheme.ColorMode mode = (theme == ChatBubbleTheme.LIGHT) ? ChatBubbleTheme.ColorMode.LIGHT : ChatBubbleTheme.ColorMode.DARK;
         ChatBubbleTheme.Accent accent = themeAccent != null ? themeAccent : ChatBubbleTheme.Accent.BLUE;
         Map<String, Integer> custom = parseCustomMap(themeCustom);
-        return ChatBubbleTheme.resolve(mode, accent, custom);
+        return ChatBubbleTheme.resolve(theme != null ? theme : ThemePreset.DARK, accent, custom);
     }
 
     /** 关键色纹理主题：本地主题（实时预览），未初始化回退 DARK。 */
-    private ChatBubbleTheme texTheme() { return theme != null ? theme : ChatBubbleTheme.DARK; }
+    private ChatBubbleTheme texTheme() {
+        return (theme == null || theme.mode() == ChatBubbleTheme.ColorMode.DARK)
+            ? ChatBubbleTheme.DARK : ChatBubbleTheme.LIGHT;
+    }
 
     private static Map<String, Integer> parseCustomMap(Map<String, String> m) {
         if (m == null || m.isEmpty()) return Map.of();
@@ -86,7 +89,7 @@ public class ChatBubbleConfigScreen extends Screen {
     private final boolean[] expanded = {true, true, true, true, true};
 
     // ---- mutable copies (loadFromConfig → widget edits → saveToConfig) ----
-    private ChatBubbleTheme theme;
+    private ThemePreset theme;
     private ChatBubbleTheme.Accent themeAccent;
     private Map<String, String> themeCustom;
     private boolean enabled, redDotEnabled, hideChatIcon, animationEnabled;
@@ -218,7 +221,7 @@ public class ChatBubbleConfigScreen extends Screen {
 
     private void saveAll() {
         ChatBubbleClientSetup.saveConfig(new ChatBubbleConfig(
-            enabled, theme.name().toLowerCase(),
+            enabled, theme.key(),
             themeAccent != null ? themeAccent.key() : "blue",
             themeCustom != null ? themeCustom : Map.of(),
             redDotEnabled, hideChatIcon, animationEnabled,
@@ -258,7 +261,7 @@ public class ChatBubbleConfigScreen extends Screen {
 
     private void loadFromConfig() {
         var cfg = ChatBubbleClientSetup.config();
-        try { theme = ChatBubbleTheme.valueOf(cfg.theme().toUpperCase()); } catch (Exception e) { theme = ChatBubbleTheme.DARK; }
+        theme = ThemePreset.parse(cfg.theme());
         themeAccent = ChatBubbleTheme.Accent.parse(cfg.themeAccent());
         themeCustom = cfg.themeCustom() != null ? new HashMap<>(cfg.themeCustom()) : new HashMap<>();
         enabled = cfg.enabled(); redDotEnabled = cfg.redDotEnabled();
@@ -467,7 +470,7 @@ public class ChatBubbleConfigScreen extends Screen {
         static OptionDef overlayStyle(String key, Ref<String> r) {
             return new OptionDef(key, Kind.OVERLAY_STYLE, r, 0, 0, 0, null);
         }
-        static OptionDef themeCycle(String key, Ref<ChatBubbleTheme> r) {
+        static OptionDef themeCycle(String key, Ref<ThemePreset> r) {
             return new OptionDef(key, Kind.THEME_CYCLE, r, 0, 0, 0, null);
         }
         static OptionDef accentCycle(String key, Ref<ChatBubbleTheme.Accent> r) {
@@ -785,11 +788,10 @@ public class ChatBubbleConfigScreen extends Screen {
 
     private ButtonWidget mkThemeButton(int y) {
         return ButtonWidget.builder(
-            Text.translatable("e33chat.theme." + theme.name().toLowerCase()),
+            Text.translatable("e33chat.theme." + (theme != null ? theme.key() : "dark")),
             btn -> {
-                int next = (theme.ordinal() + 1) % ChatBubbleTheme.values().length;
-                theme = ChatBubbleTheme.values()[next];
-                btn.setMessage(Text.translatable("e33chat.theme." + theme.name().toLowerCase()));
+                theme = (theme != null ? theme : ThemePreset.DARK).next();
+                btn.setMessage(Text.translatable("e33chat.theme." + theme.key()));
             }
         ).position(inputX, y).size(INPUT_W, 20).build();
     }

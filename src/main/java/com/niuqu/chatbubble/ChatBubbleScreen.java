@@ -4475,9 +4475,11 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
                 setFocused(chatField);
                 break;
             case 2: { // theme
-                ChatBubbleTheme next = theme() == ChatBubbleTheme.DARK ? ChatBubbleTheme.LIGHT : ChatBubbleTheme.DARK;
-                ChatBubbleClientSetup.saveConfig(ChatBubbleClientSetup.config().withTheme(next.name().toLowerCase()));
-                        int editColor = next == ChatBubbleTheme.LIGHT ? c().textSecondary() : c().textPrimary();
+                // 循环切换 8 套外观预设（dark → light → midnight → forest → ocean → mono → sakura → autumn → dark）
+                com.niuqu.chatbubble.render.ThemePreset next = com.niuqu.chatbubble.render.ThemePreset.current().next();
+                ChatBubbleClientSetup.saveConfig(ChatBubbleClientSetup.config().withTheme(next.key()));
+                boolean light = next.mode() == ChatBubbleTheme.ColorMode.LIGHT;
+                int editColor = light ? c().textSecondary() : c().textPrimary();
                 chatField.setEditableColor(editColor);
                 chatField.setUneditableColor(c().textMuted());
                 sidebarSearchBox.setEditableColor(editColor);
@@ -4486,7 +4488,7 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
                 quickChatInput.setUneditableColor(c().textMuted());
                 searchInput.setEditableColor(editColor);
                 searchInput.setUneditableColor(c().textMuted());
-                int cmdAlpha = next == ChatBubbleTheme.LIGHT ? 0x99 : 0xDD;
+                int cmdAlpha = light ? 0x99 : 0xDD;
                 commandSuggestions = new ChatInputSuggestor(client, this, chatField, textRenderer,
                     false, false, 0, 8, true, ChatBubbleTheme.alphaBlend(c().panelBg(), cmdAlpha));
                 commandSuggestions.setWindowActive(true);
