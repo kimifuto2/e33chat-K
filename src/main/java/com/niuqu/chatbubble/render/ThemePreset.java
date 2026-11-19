@@ -59,6 +59,19 @@ public enum ThemePreset {
         return mode;
     }
 
+    /**
+     * 面板纹理上的**覆盖色**（叠在面板/标题/底栏/侧边栏纹理上方的一层半透明色）。
+     *
+     * 纹理是按深/浅两套烘焙的，预设只改颜色不改纹理 —— 若不叠这层，除输入框等
+     * 少数走颜色填充的元素外，面板看起来仍是原来的暗/浅色（樱花粉会与浅色完全一样）。
+     * DARK/LIGHT 两个原预设返回 0（不叠加，保持原观感）。
+     */
+    public int overlayColor() {
+        if (this == DARK || this == LIGHT) return 0;
+        int a = (mode == ChatBubbleTheme.ColorMode.LIGHT) ? 0x4D : 0x66;
+        return (a << 24) | (bgTint & 0x00FFFFFF);
+    }
+
     /** 该预设的基准调色板（未套强调色、未套自定义覆盖）。 */
     public ChatBubbleTheme.Colors baseColors() {
         if (cached != null) return cached;
