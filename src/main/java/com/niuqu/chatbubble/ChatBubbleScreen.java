@@ -549,9 +549,12 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
         layoutInputField();
     }
 
+    /** 输入框宽度里给「光标」预留的一个字母宽度（长文本时光标会被 clamp 到文本区右缘）。 */
+    private static final int INPUT_CURSOR_RESERVE = 6;
+
     /** 输入框宽度的唯一算法（窄窗口下不能算出 0/负值，见 {@link #MIN_INPUT_W}）。 */
     private int inputFieldWidth(int inputX, int sendX) {
-        return Math.max(MIN_INPUT_W, sendX - ICON_S - 8 - inputX);
+        return Math.max(MIN_INPUT_W, sendX - ICON_S - 8 - inputX - INPUT_CURSOR_RESERVE);
     }
 
     /** 底栏输入框**本体**的左边界（不含已选动作前缀）；绘制与布局都从这里取值。 */
@@ -4526,7 +4529,8 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
         int ibX = inputBaseX();
         int ibY = inputBarY();
         // 输入框本体宽 = 文字框宽（动作前缀已经是文本内容，不再额外占宽）。
-        int ibW = input.getWidth();
+        // 文本区收窄一个字母宽 + 底板补回，光标不会再压出圆角边框
+        int ibW = input.getWidth() + INPUT_CURSOR_RESERVE;
         int ibH = inputBarH();
         // Rounded input box with a subtle border. Radius uses the same set as the
         // bottom-bar icon buttons (drawIconButton: outer ring 6f + 1px inset 5f) so the
