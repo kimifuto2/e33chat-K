@@ -19,17 +19,17 @@ public enum ThemePreset {
     /** 米色浅色（原 light）。 */
     LIGHT("light", ChatBubbleTheme.ColorMode.LIGHT, 0x000000, 0.00, 0x2D2D1F, 0.00, 0, 0.00),
     /** 午夜蓝：深海军蓝底 + 冷白字。 */
-    MIDNIGHT("midnight", ChatBubbleTheme.ColorMode.DARK, 0xFF17243C, 0.60, 0xFFE6EEFF, 0.28, 222, 0.42),
+    MIDNIGHT("midnight", ChatBubbleTheme.ColorMode.DARK, 0xFF14243F, 0.85, 0xFFE6EEFF, 0.28, 222, 0.42),
     /** 森野绿：深林绿底 + 微绿白字。 */
-    FOREST("forest", ChatBubbleTheme.ColorMode.DARK, 0xFF16241A, 0.60, 0xFFE9F4E3, 0.28, 110, 0.30),
+    FOREST("forest", ChatBubbleTheme.ColorMode.DARK, 0xFF16281A, 0.85, 0xFFE9F4E3, 0.28, 110, 0.30),
     /** 深海青：墨青底 + 冰蓝白字。 */
-    OCEAN("ocean", ChatBubbleTheme.ColorMode.DARK, 0xFF102530, 0.62, 0xFFE2F4F8, 0.26, 192, 0.38),
+    OCEAN("ocean", ChatBubbleTheme.ColorMode.DARK, 0xFF0F2733, 0.85, 0xFFE2F4F8, 0.26, 192, 0.38),
     /** 极简灰：中性深灰底 + 纯白字（低饱和）。 */
-    MONO("mono", ChatBubbleTheme.ColorMode.DARK, 0xFF262626, 0.45, 0xFFFFFFFF, 0.30, 0, 0.04),
+    MONO("mono", ChatBubbleTheme.ColorMode.DARK, 0xFF262626, 0.75, 0xFFFFFFFF, 0.30, 0, 0.04),
     /** 樱花粉：藕粉浅底 + 深梅字。 */
-    SAKURA("sakura", ChatBubbleTheme.ColorMode.LIGHT, 0xFFF7E4EA, 0.58, 0xFF3B2430, 0.30, 342, 0.30),
+    SAKURA("sakura", ChatBubbleTheme.ColorMode.LIGHT, 0xFFF6DCE6, 0.75, 0xFF3B2430, 0.30, 342, 0.30),
     /** 秋褐橙：暖沙浅底 + 深褐字。 */
-    AUTUMN("autumn", ChatBubbleTheme.ColorMode.LIGHT, 0xFFF4E6D4, 0.58, 0xFF3A2A18, 0.30, 32, 0.34);
+    AUTUMN("autumn", ChatBubbleTheme.ColorMode.LIGHT, 0xFFF4DFC0, 0.75, 0xFF3A2A18, 0.30, 32, 0.34);
 
     private final String key;
     private final ChatBubbleTheme.ColorMode mode;

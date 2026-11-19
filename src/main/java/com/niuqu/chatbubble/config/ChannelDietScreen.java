@@ -2,6 +2,7 @@ package com.niuqu.chatbubble.config;
 
 import com.mojang.logging.LogUtils;
 import com.niuqu.chatbubble.ChatBubbleClientSetup;
+import com.niuqu.chatbubble.render.ThemeSkin;
 import com.niuqu.chatbubble.channeldiet.ChannelDietFilter;
 import com.niuqu.chatbubble.channeldiet.ChannelDietNames;
 import com.niuqu.chatbubble.channeldiet.ChannelDietStats;
