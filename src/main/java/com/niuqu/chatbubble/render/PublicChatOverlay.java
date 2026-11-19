@@ -78,6 +78,14 @@ public final class PublicChatOverlay {
     private static final long MAX_FRAME_STEP_MS = 100L;
     /** 重建快照时最多回扫的消息条数（只取最新几条公屏，不必扫全量）。 */
     private static final int SCAN_LIMIT = 200;
+    /** 样式 A（纯文字）的裁剪宽度。 */
+    private static final int PLAIN_W = 220;
+    /** 样式 C/D 的气泡最小宽度、垂直内边距、气泡间距。 */
+    private static final int BUBBLE_MIN_W = 48;
+    private static final int BUBBLE_PAD_V = 2;
+    private static final int BUBBLE_GAP = 2;
+    /** 样式 C/D 气泡背景 alpha。 */
+    private static final int BUBBLE_ALPHA = 176;
 
     private PublicChatOverlay() {}
 
@@ -174,17 +182,31 @@ public final class PublicChatOverlay {
         for (View v : fading) fadeRows += v.rows();
 
         int lineH = tr.lineHeight + 1;
+        ChatBubbleTheme.Colors c = Appearance.snapshot();
+        PublicOverlayStyle style = PublicOverlayStyle.parse(cfg.publicOverlayStyle());
+        if (style == null) style = PublicOverlayStyle.C;
+        switch (style) {
+            case A -> renderPlain(g, tr, c, x, iconY, lineH, anim);
+            case B -> renderPanel(g, tr, c, x, iconY, panelW, shownRows, lineH, anim);
+            case D -> renderTicker(g, tr, c, x, iconY, panelW, lineH, anim);
+            default -> renderBubbles(g, tr, c, x, iconY, panelW, lineH, anim);
+        }
+    }
+
+    /** 样式 B：一整块半透明圆角面板（原实现的默认观感）。 */
+    private static void renderPanel(UiCanvas g, Font tr, ChatBubbleTheme.Colors c,
+                                    int x, int iconY, int panelW, int shownRows, int lineH, float anim) {
+        int fadeRows = 0;
+        for (View v : fading) fadeRows += v.rows();
+
         int panelH = shownRows * lineH + PAD * 2;
         int top = iconY - GAP_ABOVE_ICON - panelH;
-        // 淡出行占位在常驻行之上；t=0 时整块再往下滑 slideRows 行，动画结束时归位
         int blockTop = top + PAD - fadeRows * lineH
             + (int) Math.round((1f - anim) * slideRows * lineH);
 
-        ChatBubbleTheme.Colors c = Appearance.snapshot();
         RoundRectRenderer.fill(g, x, top, x + panelW, top + panelH, RADIUS,
             ChatBubbleTheme.alphaBlend(c.popupBg(), Math.round(PANEL_ALPHA * panelAlpha)));
 
-        // 文字裁到面板内：新消息从面板底边滑入、被顶出的那条从顶边滑出
         g.enableScissor(x, top, x + panelW, top + panelH);
         int y = blockTop;
         for (View v : fading) y = drawView(g, tr, c, v, x + PAD, y, lineH, (1f - anim) * panelAlpha);
@@ -192,6 +214,90 @@ public final class PublicChatOverlay {
             boolean newest = i == shown.size() - 1;
             y = drawView(g, tr, c, shown.get(i), x + PAD, y, lineH, (newest ? anim : 1f) * panelAlpha);
         }
+        g.disableScissor();
+    }
+
+    /** 样式 A：纯文字（无底板），带阴影。 */
+    private static void renderPlain(UiCanvas g, Font tr, ChatBubbleTheme.Colors c,
+                                    int x, int iconY, int lineH, float anim) {
+        int shownRows = 0;
+        for (View v : shown) shownRows += v.rows();
+        int fadeRows = 0;
+        for (View v : fading) fadeRows += v.rows();
+
+        int blockH = (shownRows + fadeRows) * lineH;
+        int top = iconY - GAP_ABOVE_ICON - blockH;
+        int blockTop = top + (int) Math.round((1f - anim) * slideRows * lineH);
+
+        g.enableScissor(x, top, x + PLAIN_W, iconY - GAP_ABOVE_ICON);
+        int y = blockTop;
+        for (View v : fading) y = drawViewShadow(g, tr, c, v, x, y, lineH, (1f - anim) * panelAlpha);
+        for (int i = 0; i < shown.size(); i++) {
+            boolean newest = i == shown.size() - 1;
+            y = drawViewShadow(g, tr, c, shown.get(i), x, y, lineH, (newest ? anim : 1f) * panelAlpha);
+        }
+        g.disableScissor();
+    }
+
+    /** 样式 C：每行一个独立小圆角气泡（宽度按该条消息自适应）。 */
+    private static void renderBubbles(UiCanvas g, Font tr, ChatBubbleTheme.Colors c,
+                                      int x, int iconY, int panelW, int lineH, float anim) {
+        int n = shown.size();
+        if (n <= 0) return;
+
+        int[] widths = new int[n];
+        int[] heights = new int[n];
+        int total = 0;
+        for (int i = 0; i < n; i++) {
+            View v = shown.get(i);
+            int w = PAD * 2;
+            for (String line : v.lines) w = Math.max(w, tr.width(line) + v.indent);
+            widths[i] = Math.max(BUBBLE_MIN_W, Math.min(panelW, w));
+            heights[i] = v.rows() * lineH + BUBBLE_PAD_V * 2;
+            total += heights[i] + (i > 0 ? BUBBLE_GAP : 0);
+        }
+
+        int top = iconY - GAP_ABOVE_ICON - total;
+        int blockTop = top + (int) Math.round((1f - anim) * slideRows * lineH);
+
+        g.enableScissor(x, Math.min(top, blockTop), x + panelW, iconY - GAP_ABOVE_ICON);
+        int y = blockTop;
+        for (int i = 0; i < n; i++) {
+            boolean newest = i == n - 1;
+            float a = (newest ? anim : 1f) * panelAlpha;
+            int bw = widths[i];
+            int bh = heights[i];
+            int a255 = Math.round(BUBBLE_ALPHA * a);
+            if (a255 > 2) {
+                RoundRectRenderer.fill(g, x, y, x + bw, y + bh, RADIUS,
+                    ChatBubbleTheme.alphaBlend(c.popupBg(), Math.min(255, a255)));
+            }
+            drawView(g, tr, c, shown.get(i), x + PAD, y + BUBBLE_PAD_V, lineH, a);
+            y += bh + BUBBLE_GAP;
+        }
+        g.disableScissor();
+    }
+
+    /** 样式 D：单行跑马灯 —— 只显示最新 1 条。 */
+    private static void renderTicker(UiCanvas g, Font tr, ChatBubbleTheme.Colors c,
+                                     int x, int iconY, int panelW, int lineH, float anim) {
+        if (shown.isEmpty()) return;
+        View v = shown.get(shown.size() - 1);
+
+        String text = v.lines.isEmpty() ? v.name : v.lines.get(0);
+        int w = Math.min(panelW, tr.width(text) + v.indent + PAD * 2);
+        int h = lineH + BUBBLE_PAD_V * 2;
+        int top = iconY - GAP_ABOVE_ICON - h;
+        int blockTop = top + (int) Math.round((1f - anim) * slideRows * lineH);
+
+        float a = anim * panelAlpha;
+        int a255 = Math.round(BUBBLE_ALPHA * a);
+        if (a255 > 2) {
+            RoundRectRenderer.fill(g, x, blockTop, x + w, blockTop + h, RADIUS,
+                ChatBubbleTheme.alphaBlend(c.popupBg(), Math.min(255, a255)));
+        }
+        g.enableScissor(x, blockTop, x + panelW, blockTop + h);
+        drawView(g, tr, c, v, x + PAD, blockTop + BUBBLE_PAD_V, lineH, a);
         g.disableScissor();
     }
 
@@ -275,6 +381,21 @@ public final class PublicChatOverlay {
             g.drawText(tr, v.name, x, y, nameColor, false);
             for (int i = 0; i < v.lines.size(); i++) {
                 g.drawText(tr, v.lines.get(i), x + v.indent, y + i * lineH, bodyColor, false);
+            }
+        }
+        return y + v.rows() * lineH;
+    }
+
+    /** 样式 A 专用：文字带阴影（无底板时保证可读）。 */
+    private static int drawViewShadow(UiCanvas g, Font tr, ChatBubbleTheme.Colors c,
+                                      View v, int x, int y, int lineH, float alpha) {
+        int a = Math.max(0, Math.min(255, Math.round(alpha * 255f)));
+        if (a > 0) {
+            int nameColor = ChatBubbleTheme.alphaBlend(c.nameColor(), a);
+            int bodyColor = ChatBubbleTheme.alphaBlend(c.textPrimary(), a);
+            g.drawText(tr, v.name, x, y, nameColor, true);
+            for (int i = 0; i < v.lines.size(); i++) {
+                g.drawText(tr, v.lines.get(i), x + v.indent, y + i * lineH, bodyColor, true);
             }
         }
         return y + v.rows() * lineH;
