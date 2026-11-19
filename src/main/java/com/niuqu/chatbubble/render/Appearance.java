@@ -17,6 +17,11 @@ public final class Appearance {
             ? ChatBubbleTheme.LIGHT : ChatBubbleTheme.DARK;
     }
 
+    /** 当前预设的面板覆盖色（0 = 不叠加；DARK/LIGHT 原样）。 */
+    public static int presetOverlay() {
+        return ThemePreset.current().overlayColor();
+    }
+
     /** 当前主题的颜色快照（含强调色与自定义覆盖）。 */
     public static ChatBubbleTheme.Colors snapshot() {
         ChatBubbleConfig cfg = ChatBubbleClientSetup.config();
