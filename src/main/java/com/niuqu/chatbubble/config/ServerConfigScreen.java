@@ -1,5 +1,6 @@
 package com.niuqu.chatbubble.config;
 import com.niuqu.chatbubble.store.ChatMessageStore;
+import com.niuqu.chatbubble.render.ThemeSkin;
 
 import com.niuqu.chatbubble.chat.TemplateMatcher;
 import com.niuqu.chatbubble.network.ServerConfigSavePayload;
