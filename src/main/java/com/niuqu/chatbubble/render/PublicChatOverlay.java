@@ -262,6 +262,11 @@ public final class PublicChatOverlay {
             // 注意必须把首行「名字」占的 indent 与左右内边距 PAD*2 一起算进去：
             // 只算文本宽度会让气泡比文字窄一个内边距，末字顶出气泡外。
             for (String line : v.lines) w = Math.max(w, tr.getWidth(line) + v.indent + PAD * 2);
+            // 合并标记 xN 画在最后一行文字之后、不在 lines 里：它也要算进气泡宽度，
+            // 否则短消息时 xN 会被画到气泡外面（长消息因为行宽已接近上限才看不出来）。
+            if (v.dup > 1 && v.dupLabelLine == v.lines.size() - 1) {
+                w = Math.max(w, v.indent + v.dupLabelX + tr.getWidth(" x" + v.dup) + PAD * 2);
+            }
             widths[i] = Math.max(BUBBLE_MIN_W, Math.min(panelW, w));
             heights[i] = v.rows() * lineH + BUBBLE_PAD_V * 2;
             total += heights[i] + (i > 0 ? BUBBLE_GAP : 0);
