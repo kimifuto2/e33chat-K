@@ -533,12 +533,13 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
             quickChatInput.setVisible(false);
         });
 
-        // 睡觉时：把床上界面那颗「起床」按钮原样搬进聊天面板（同一套 vanilla 按钮样式），
-        // 位置贴在底栏输入框正上方 —— 打开 / 关闭聊天面板时按钮一直都在。
+        // 睡觉时：把床上界面那颗「起床」按钮原样搬进聊天面板 —— 坐标与 BedScreen 里那颗
+        // 完全一致（屏幕底部居中）。**不**加进 children：它要在面板背景之前绘制，
+        // 这样聊天面板始终压在它上面（按钮透过半透明面板若隐若现），不是浮在面板之上。
         if (sleepMode) {
-            leaveBedButton = addDrawableChild(ButtonWidget.builder(
+            leaveBedButton = ButtonWidget.builder(
                     Text.translatable("multiplayer.stopSleeping"), b -> leaveBed())
-                .dimensions(width / 2 - 100, barTop - 22, 200, 20).build());
+                .dimensions(width / 2 - 100, height - 40, 200, 20).build();
         }
     }
 
@@ -2635,6 +2636,12 @@ boolean selDrag = textSelection.isDragActive();
             ? (int)(anim * SIDEBAR_W) : panelX;
         if (ChatBubbleClientSetup.config().blurEnabled() && panelOpacity < 0.999f && !zoom) {
             BlurRenderer.blurPanel(g, panelOffset + fillLeft, 0, panelX + panelW - fillLeft, height);
+        }
+        // 睡觉时那颗「起床」按钮：画在面板背景**之前**（坐标与 BedScreen 里那颗一致）。
+        // 于是聊天面板（含背景）永远压在它上面 —— 按钮透过半透明面板若隐若现，
+        // 不会浮在聊天内容之上。想让它更清楚就把「面板透明度」调低。
+        if (leaveBedButton != null) {
+            leaveBedButton.render(g, mouseX, mouseY, delta);
         }
         ColoredTextureRenderer.drawWithAlpha(g, UiTextureManager.rl(UiElement.PANEL_BG),
             fillLeft, 0, panelX + panelW - fillLeft, height, panelOpacity);
