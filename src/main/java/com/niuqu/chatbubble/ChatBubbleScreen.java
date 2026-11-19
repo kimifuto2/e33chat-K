@@ -1871,8 +1871,10 @@ if (this.getFocused() != null && this.getFocused().keyPressed(input))
         // Scrollbar interaction
         if (button == 0 && maxScroll > 0) {
             int trackX = panelX + panelW - SCROLLBAR_WIDTH;
+            // 命中区比 6px 可视条宽一点（左扩 6px），不然很难抓住、容易「拖了个寂寞」
+            int hitLeft = trackX - 6;
             int effBottom = newMessageCount > 0 ? barTop - NOTIF_H - 1 : msgBottom;
-            if (mouseX >= trackX && mouseX < trackX + SCROLLBAR_WIDTH
+            if (mouseX >= hitLeft && mouseX < panelX + panelW
                 && mouseY >= msgTop && mouseY < effBottom) {
                 int trackH = effBottom - msgTop;
                 int thumbH = Math.max(MIN_THUMB_H, (int) ((long) trackH * trackH / messageTotalH));
@@ -2190,10 +2192,12 @@ if (quotePressPending
             int travelRange = trackH - thumbH;
             if (travelRange > 0) {
                 int dy = (int) click.y() - scrollbarDragStartY;
-                float newTarget = MathHelper.clamp(scrollbarDragStartOffset + (int) ((long) dy * maxScroll / travelRange), 0, maxScroll);
-                scrollAnimFrom = scrollOffset; scrollAnimTo = newTarget;
-                scrollAnimStart = Util.getMeasuringTimeMs();
-                if (!scrollAnimActive) { scrollAnimDuration = 80; scrollAnimActive = true; }
+                // 拖动必须 1:1 跟手：直接落位。原来这里每次都开一个 80ms 的滚动补间，
+                // 鼠标一动就重置目标，滑块永远慢半拍（用户反馈「滚动条不跟手」）。
+                scrollOffset = MathHelper.clamp(
+                    scrollbarDragStartOffset + (int) ((long) dy * maxScroll / travelRange), 0, maxScroll);
+                scrollAnimActive = false;
+                scrollToBottom = false;
             }
             return true;
         }
