@@ -288,16 +288,18 @@ public final class PublicChatOverlay {
         if (shown.isEmpty()) return;
         View v = shown.get(shown.size() - 1);
 
-        // 单行跑马灯：只画首行，超出可用宽度的部分用 "..." 省略（不再让字被气泡边缘切一半）。
-        String text = ellipsize(tr,
-            v.lines.isEmpty() ? v.name : v.lines.get(0), panelW - PAD * 2 - v.indent);
+        // 单行跑马灯：用**未换行的完整正文**做省略（用 v.lines.get(0) 只是一条换行结果，
+        // 后面的内容被静默丢掉、也不会出现 "..."）。换行/制表压成空格，整体拼成一行。
+        String body = v.body == null ? "" : v.body.replace('\n', ' ').replace('\t', ' ');
+        if (body.isEmpty() && !v.lines.isEmpty()) body = v.lines.get(0);
+        String text = ellipsize(tr, body, panelW - PAD * 2 - v.indent);
         int w = Math.min(panelW, tr.getWidth(text) + v.indent + PAD * 2);
         int h = lineH + BUBBLE_PAD_V * 2;
         int top = iconY - GAP_ABOVE_ICON - h;
         int blockTop = top + (int) Math.round((1f - anim) * slideRows * lineH);
 
-        float a = anim * panelAlpha;
-        int a255 = Math.round(BUBBLE_ALPHA * a);
+        // 透明度与样式 C 的气泡完全一致（176）；滑动动画只影响纵向位移，不再让气泡整体变淡。
+        int a255 = Math.round(BUBBLE_ALPHA * panelAlpha);
         if (a255 > 2) {
             RoundRectRenderer.fill(g, x, blockTop, x + w, blockTop + h, RADIUS,
                 ChatBubbleTheme.alphaBlend(c.popupBg(), Math.min(255, a255)));
