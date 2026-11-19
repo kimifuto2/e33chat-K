@@ -63,7 +63,9 @@ public class ChatBubbleHudOverlay {
                 mc.getWindow().getGuiScaledHeight());
         }
 
-        if (mc.gui.screen() != null) { g.getMatrices().popMatrix(); return; }
+        // 睡觉时不画 HUD 的聊天图标/按键提示/公屏小窗：床上的界面由 BedScreen 或
+        // 聊天面板负责，底下再压一个 [T] 提示很割裂
+        if (mc.gui.screen() != null || mc.player.isSleeping()) { g.getMatrices().popMatrix(); return; }
 
         String keyName = mc.options.keyChat.getTranslatedKeyMessage().getString();
         int screenH = mc.getWindow().getGuiScaledHeight();
@@ -112,6 +114,7 @@ public class ChatBubbleHudOverlay {
         if (cfg().hideChatIcon()) return false;
         Minecraft mc = Minecraft.getInstance();
         if (mc.gui.screen() != null) return false;
+        if (mc.player != null && mc.player.isSleeping()) return false;
         int screenH = mc.getWindow().getGuiScaledHeight();
         int iconY = screenH - ICON_S - 20;
         return mx >= 3 && mx <= 3 + ICON_S && my >= iconY && my <= iconY + ICON_S + mc.font.lineHeight + 2;
