@@ -7,10 +7,17 @@ import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.network.packet.c2s.play.ClientCommandC2SPacket;
 import net.minecraft.text.Text;
+import net.minecraft.util.Util;
 
 public class BedScreen extends Screen {
 
     private static Screen screenBeforeSleep;
+    /** 「起床」后的一小段时间内不再自动弹出床屏（起床包要一个往返才生效）。 */
+    private static long suppressUntil;
+
+    public static void suppressFor(long millis) { suppressUntil = Util.getMeasuringTimeMs() + millis; }
+
+    public static boolean isSuppressed() { return Util.getMeasuringTimeMs() < suppressUntil; }
 
     public BedScreen() {
         super(Text.translatable("multiplayer.stopSleeping"));
