@@ -96,6 +96,10 @@ public final class PublicChatOverlay {
         String body = "";
         /** 反刷屏合并计数（与聊天栏一致：>1 时在正文末尾追加 " xN"）。 */
         int dup = 1;
+        /** 合并标记 " xN" 画在第几行（-1 = 没有）。 */
+        int dupLabelLine = -1;
+        /** 合并标记在该行内的起始 x（相对正文起点）。 */
+        int dupLabelX;
         /** 画在首行的「名字:」，后续行不再重复。 */
         String name = "";
         /** 正文缩进（名字宽度 + 空格），后续行对齐到这里。 */
@@ -290,8 +294,9 @@ public final class PublicChatOverlay {
         // 单行跑马灯：用完整正文做省略（只取首行换行结果会丢掉后续内容、也不会出现 ...）
         String body = v.body == null ? "" : v.body.replace('\n', ' ').replace('\t', ' ');
         if (body.isEmpty() && !v.lines.isEmpty()) body = v.lines.get(0);
-        String text = ellipsize(tr, body, panelW - PAD * 2 - v.indent);
-        int w = Math.min(panelW, tr.width(text) + v.indent + PAD * 2);
+        int dupW = v.dup > 1 ? tr.width(" x" + v.dup) : 0;
+        String text = ellipsize(tr, body, panelW - PAD * 2 - v.indent - dupW);
+        int w = Math.min(panelW, tr.width(text) + v.indent + PAD * 2 + dupW);
         int h = lineH + BUBBLE_PAD_V * 2;
         int top = iconY - GAP_ABOVE_ICON - h;
         int blockTop = top + (int) Math.round((1f - anim) * slideRows * lineH);
@@ -311,6 +316,10 @@ public final class PublicChatOverlay {
                 ChatBubbleTheme.alphaBlend(c.nameColor(), t255), false);
             g.drawText(tr, text, x + PAD + v.indent, blockTop + BUBBLE_PAD_V,
                 ChatBubbleTheme.alphaBlend(c.textPrimary(), t255), false);
+            if (v.dup > 1) {
+                g.drawText(tr, " x" + v.dup, x + PAD + v.indent + tr.width(text),
+                    blockTop + BUBBLE_PAD_V, ChatBubbleTheme.alphaBlend(c.duplicateLabel(), t255), false);
+            }
         }
         g.disableScissor();
     }
@@ -396,6 +405,7 @@ public final class PublicChatOverlay {
             for (int i = 0; i < v.lines.size(); i++) {
                 g.drawText(tr, v.lines.get(i), x + v.indent, y + i * lineH, bodyColor, false);
             }
+            drawDupLabel(g, tr, c, v, x, y, lineH, a, false);
         }
         return y + v.rows() * lineH;
     }
@@ -422,8 +432,18 @@ public final class PublicChatOverlay {
             for (int i = 0; i < v.lines.size(); i++) {
                 g.drawText(tr, v.lines.get(i), x + v.indent, y + i * lineH, bodyColor, true);
             }
+            drawDupLabel(g, tr, c, v, x, y, lineH, a, true);
         }
         return y + v.rows() * lineH;
+    }
+
+    /** 反刷屏合并标记 " xN"：用强调色（duplicateLabel）单独绘制，和正文明显区分。 */
+    private static void drawDupLabel(UiCanvas g, Font tr, ChatBubbleTheme.Colors c,
+                                     View v, int x, int y, int lineH, int alpha, boolean shadow) {
+        if (v.dupLabelLine < 0 || v.dup <= 1) return;
+        String label = " x" + v.dup;
+        g.drawText(tr, label, x + v.indent + v.dupLabelX, y + v.dupLabelLine * lineH,
+            ChatBubbleTheme.alphaBlend(c.duplicateLabel(), alpha), shadow);
     }
 
     // ---- 快照刷新（只在「消息变了」或「宽度变了」时跑） ----
@@ -515,7 +535,7 @@ public final class PublicChatOverlay {
 
     /**
      * 缓存命中时只在「宽度或名字/正文变了」才重排，避免每次刷新都重新量宽度换行。
-     * 换行宽度用 {@link TextRenderer#wrapLines} 的真实字体度量，不按字符数估算。
+     * 换行宽度用 {@code Font#split} 的真实字体度量，不按字符数估算。
      */
     private static void layout(Font tr, View v, ChatMessage m, int textW) {
         String rawName = cleanName(m);
@@ -523,7 +543,6 @@ public final class PublicChatOverlay {
         // 反刷屏折叠与聊天栏一致：同一条消息被合并 N 次时只保留一条，并在正文尾部标 " xN"。
         // （antiSpam 关闭时存档层不会合并，duplicateCount 恒为 1，这里自然不出现标记）
         int dup = Math.max(1, m.duplicateCount());
-        if (dup > 1) body = body + " x" + dup;
         if (v.layoutW == textW && rawName.equals(v.rawName) && body.equals(v.body) && dup == v.dup) return;
         v.layoutW = textW;
         v.rawName = rawName;
@@ -546,6 +565,36 @@ public final class PublicChatOverlay {
             v.lines.add(plain(line));
         }
         truncate(tr, v, MAX_ROWS);
+        placeDupLabel(tr, v);
+    }
+
+    /**
+     * 把反刷屏合并标记 " xN" 定位到最后一行末尾：放得下就跟在同一行，放不下就单独占一行。
+     * 标记不拼进正文，是为了能用强调色（{@code duplicateLabel}）单独绘制 —— 与正文同色
+     * 时玩家很难区分「这是合并次数」还是正文内容。
+     */
+    private static void placeDupLabel(Font tr, View v) {
+        v.dupLabelLine = -1;
+        v.dupLabelX = 0;
+        if (v.dup <= 1) return;
+        String label = " x" + v.dup;
+        int labelW = tr.width(label);
+        if (v.lines.isEmpty()) {
+            v.lines.add("");
+            v.dupLabelLine = 0;
+            v.dupLabelX = 0;
+            return;
+        }
+        int last = v.lines.size() - 1;
+        int lastW = tr.width(v.lines.get(last));
+        if (lastW + labelW <= v.wrapW) {
+            v.dupLabelLine = last;
+            v.dupLabelX = lastW;
+        } else {
+            v.lines.add("");
+            v.dupLabelLine = v.lines.size() - 1;
+            v.dupLabelX = 0;
+        }
     }
 
     private static void truncate(Font tr, View v, int maxRows) {
