@@ -2,7 +2,6 @@ package com.niuqu.chatbubble.render;
 import com.niuqu.chatbubble.ChatBubbleClientSetup;
 import com.niuqu.chatbubble.store.ChatMessageStore;
 import com.niuqu.chatbubble.ChatBubbleScreen;
-import com.niuqu.chatbubble.ui.BedScreen;
 import com.niuqu.chatbubble.ChatBubbleMod;
 import com.niuqu.chatbubble.config.ChatBubbleConfig;
 import com.niuqu.chatbubble.render.ChatBubbleTheme;
@@ -15,6 +14,7 @@ import com.niuqu.chatbubble.config.ChatBubbleConfig;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 
@@ -25,6 +25,10 @@ public class ChatBubbleHudOverlay {
     private static final int SRC_V = 6;
     private static final int SRC_S = 4;
     private static final int TIP_DISP = 4;
+
+    /** 睡觉时在 HUD 层画的那颗「起床」按钮（尺寸变化时重建）。 */
+    private static Button leaveBedButton;
+    private static int leaveBedW = -1, leaveBedH = -1;
 
     private static ChatBubbleConfig cfg() { return ChatBubbleClientSetup.config(); }
 
@@ -51,6 +55,11 @@ public class ChatBubbleHudOverlay {
 
         MentionNotificationBanner.INSTANCE.tick();
         boolean chatPanelOpen = mc.gui.screen() instanceof ChatBubbleScreen;
+
+        // 睡觉时那颗原版「起床」按钮：画在 **HUD 层**（屏幕内容之前）。于是它「一直显示」
+        // （打开聊天面板也不消失），而任何界面（聊天面板 / BedScreen）都画在它上面。
+        drawLeaveBedButton(raw, mc);
+
         if (mc.gui.screen() == null) {
             MentionNotificationBanner.INSTANCE.render(g,
                 mc.getWindow().getGuiScaledWidth(),
@@ -64,10 +73,11 @@ public class ChatBubbleHudOverlay {
                 mc.getWindow().getGuiScaledHeight());
         }
 
-        // 睡觉时（BedScreen）也要显示左下角的聊天图标 / [T] 提示：玩家躺在床上同样需要
-        // 「点这里聊天」的入口；聊天面板打开时依旧隐藏（和平时一致）。
-        boolean sleepingScreen = mc.gui.screen() instanceof BedScreen;
-        if (mc.gui.screen() != null && !sleepingScreen) { g.getMatrices().popMatrix(); return; }
+        // 睡觉时（BedScreen）也显示左下角的聊天图标 / [T] 提示（用户要求）；
+        // 聊天面板打开时仍按原样隐藏。
+        if (mc.gui.screen() != null && !(mc.gui.screen() instanceof com.niuqu.chatbubble.ui.BedScreen)) {
+            g.getMatrices().popMatrix(); return;
+        }
 
         String keyName = mc.options.keyChat.getTranslatedKeyMessage().getString();
         int screenH = mc.getWindow().getGuiScaledHeight();
@@ -112,10 +122,32 @@ public class ChatBubbleHudOverlay {
         }
     }
 
+    /**
+     * 睡觉时在 HUD 层画一颗原版「起床」按钮（与 {@code InBedChatScreen} 里那颗同款、同坐标）。
+     *
+     * <p>HUD 层在屏幕内容**之前**绘制，所以这颗按钮「一直存在」：打开聊天面板不会让它消失，
+     * 而任何界面（聊天面板 / 床上的 BedScreen）都画在它上面 —— 面板永远压在它上面。
+     * 这里只负责显示，点击由当前界面自己的按钮处理。
+     */
+    private static void drawLeaveBedButton(GuiGraphicsExtractor raw, Minecraft mc) {
+        if (mc.player == null || !mc.player.isSleeping()) return;
+        int w = mc.getWindow().getGuiScaledWidth();
+        int h = mc.getWindow().getGuiScaledHeight();
+        if (leaveBedButton == null || leaveBedW != w || leaveBedH != h) {
+            leaveBedW = w;
+            leaveBedH = h;
+            leaveBedButton = Button.builder(Component.translatable("multiplayer.stopSleeping"), b -> { })
+                .bounds(w / 2 - 100, h - 40, 200, 20).build();
+        }
+        int mx = (int) (mc.mouseHandler.xpos() * (double) w / Math.max(1, mc.getWindow().getWidth()));
+        int my = (int) (mc.mouseHandler.ypos() * (double) h / Math.max(1, mc.getWindow().getHeight()));
+        leaveBedButton.extractRenderState(raw, mx, my, 0f);
+    }
+
     public static boolean isMouseOverIcon(double mx, double my) {
         if (cfg().hideChatIcon()) return false;
         Minecraft mc = Minecraft.getInstance();
-        if (mc.gui.screen() != null && !(mc.gui.screen() instanceof BedScreen)) return false;
+        if (mc.gui.screen() != null && !(mc.gui.screen() instanceof com.niuqu.chatbubble.ui.BedScreen)) return false;
         int screenH = mc.getWindow().getGuiScaledHeight();
         int iconY = screenH - ICON_S - 20;
         return mx >= 3 && mx <= 3 + ICON_S && my >= iconY && my <= iconY + ICON_S + mc.font.lineHeight + 2;

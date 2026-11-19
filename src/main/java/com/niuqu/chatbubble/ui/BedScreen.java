@@ -8,17 +8,10 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.Util;
 
 public class BedScreen extends Screen {
 
     private static Screen screenBeforeSleep;
-    /** 「起床」后的一小段时间内不再自动弹出床屏（起床包要一个往返才生效）。 */
-    private static long suppressUntil;
-
-    public static void suppressFor(long millis) { suppressUntil = Util.getMillis() + millis; }
-
-    public static boolean isSuppressed() { return Util.getMillis() < suppressUntil; }
 
     public BedScreen() {
         super(Component.translatable("multiplayer.stopSleeping"));
