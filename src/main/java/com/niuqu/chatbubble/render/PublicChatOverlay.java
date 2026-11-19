@@ -285,16 +285,17 @@ public final class PublicChatOverlay {
         if (shown.isEmpty()) return;
         View v = shown.get(shown.size() - 1);
 
-        // 只画首行；超出可用宽度的部分用 "..." 省略（不再让字被气泡边缘切一半）
-        String text = ellipsize(tr,
-            v.lines.isEmpty() ? v.name : v.lines.get(0), panelW - PAD * 2 - v.indent);
+        // 单行跑马灯：用完整正文做省略（只取首行换行结果会丢掉后续内容、也不会出现 ...）
+        String body = v.body == null ? "" : v.body.replace('\n', ' ').replace('\t', ' ');
+        if (body.isEmpty() && !v.lines.isEmpty()) body = v.lines.get(0);
+        String text = ellipsize(tr, body, panelW - PAD * 2 - v.indent);
         int w = Math.min(panelW, tr.width(text) + v.indent + PAD * 2);
         int h = lineH + BUBBLE_PAD_V * 2;
         int top = iconY - GAP_ABOVE_ICON - h;
         int blockTop = top + (int) Math.round((1f - anim) * slideRows * lineH);
 
-        float a = anim * panelAlpha;
-        int a255 = Math.round(BUBBLE_ALPHA * a);
+        // 透明度与样式 C 的气泡一致（176）；滑动动画只影响纵向位移
+        int a255 = Math.round(BUBBLE_ALPHA * panelAlpha);
         if (a255 > 2) {
             RoundRectRenderer.fill(g, x, blockTop, x + w, blockTop + h, RADIUS,
                 ChatBubbleTheme.alphaBlend(c.popupBg(), Math.min(255, a255)));
