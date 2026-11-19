@@ -101,6 +101,9 @@ public final class ConfigManager {
             c.publicOverlayEnabled() != null ? c.publicOverlayEnabled() : d.publicOverlayEnabled(),
             // 公屏小窗静默秒数：旧文件缺键 → 回落默认 5 秒；手改成越界值也夹回 1~60
             clampIdleSeconds(c.publicOverlayIdleSeconds(), d.publicOverlayIdleSeconds()),
+            // 公屏小窗样式：缺键 / 非法值 → 归一化到默认 c
+            ChatBubbleConfig.normalizeOverlayStyle(
+                c.publicOverlayStyle() != null ? c.publicOverlayStyle() : d.publicOverlayStyle()),
             // 私聊免打扰名单：旧配置文件没有这个键 → 读成 null，这里回落成空表（= 没有私聊被免打扰）
             c.dndWhisperPlayers() != null ? c.dndWhisperPlayers() : d.dndWhisperPlayers(),
             // 通道节食：旧配置文件没有这个键 → null → 回落默认（关闭，只统计不裁剪）

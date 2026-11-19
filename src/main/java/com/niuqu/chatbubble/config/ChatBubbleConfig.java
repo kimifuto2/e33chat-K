@@ -81,6 +81,8 @@ public record ChatBubbleConfig(
     // 旧配置文件缺键读成 null → 回落默认 5，由 ConfigManager.mergeWithDefaults 收敛。
     // 运行时由 PublicChatOverlay 每帧读取，配置屏保存后即时生效（无需重启）。
     Integer publicOverlayIdleSeconds,
+    /** 公屏小窗样式：a=纯文字 / b=半透明面板 / c=每行气泡 / d=单行跑马灯（默认 c）。 */
+    String publicOverlayStyle,
     // 私聊免打扰名单（存玩家名）：每个私聊对象各自一个开关，A 的私聊免打扰不影响 B。
     // 公屏/系统免打扰仍然用上面的 dndEnabled（语义 = 「公屏免打扰」）。
     // 旧配置文件没有这个键时 Gson 读成 null → 由 ConfigManager.mergeWithDefaults 收敛成空表；
@@ -122,6 +124,18 @@ public record ChatBubbleConfig(
     /** 公屏小窗静默秒数（后续在 {@link #publicOverlayIdleSeconds()}）的默认值与合法范围：
      *  配置屏的输入框范围、旧配置缺键的回落值、运行时的夹取都用这三个常量，避免三处漂移。 */
     public static final int PUBLIC_OVERLAY_IDLE_DEFAULT_SECONDS = 5;
+    /** 公屏小窗样式默认值：c。 */
+    public static final String PUBLIC_OVERLAY_STYLE_DEFAULT = "c";
+
+    /** 样式字符串归一化：只认 a/b/c/d，其余回落默认 c。 */
+    public static String normalizeOverlayStyle(String s) {
+        if (s == null) return PUBLIC_OVERLAY_STYLE_DEFAULT;
+        String v = s.trim().toLowerCase();
+        return switch (v) {
+            case "a", "b", "c", "d" -> v;
+            default -> PUBLIC_OVERLAY_STYLE_DEFAULT;
+        };
+    }
     public static final int PUBLIC_OVERLAY_IDLE_MIN_SECONDS = 1;
     public static final int PUBLIC_OVERLAY_IDLE_MAX_SECONDS = 60;
 
@@ -144,6 +158,8 @@ public record ChatBubbleConfig(
             true,
             // 公屏小窗静默 5 秒后淡出
             PUBLIC_OVERLAY_IDLE_DEFAULT_SECONDS,
+            // 公屏小窗默认样式：C（每行独立小气泡）
+            PUBLIC_OVERLAY_STYLE_DEFAULT,
             // 私聊免打扰名单默认空（每个私聊各自开关，默认都不免打扰）
             List.of(),
             // 通道节食默认关闭（关闭 = 只统计不裁剪，行为与旧版一致）
@@ -181,6 +197,7 @@ public record ChatBubbleConfig(
             panelAnimStyle, bannerAnimStyle, popupAnimStyle, messageAnimStyle, imageRenderEnabled, receiveImages,
             uploadUrl, uploadField, uploadExtra, uploadResponse, messageGap, avatarSize, hideRepeatedAvatars, closeChatOnSend, bannerOpacity, bubbleSize, dndEnabled, publicOverlayEnabled,
             publicOverlayIdleSeconds,
+            publicOverlayStyle,
             dndWhisperPlayers,
             channelDietEnabled,
             channelDietMode, channelDietLimit, channelDietDisabledNamespaces,
@@ -198,6 +215,7 @@ public record ChatBubbleConfig(
             panelAnimStyle, bannerAnimStyle, popupAnimStyle, messageAnimStyle, imageRenderEnabled, receiveImages,
             uploadUrl, uploadField, uploadExtra, uploadResponse, messageGap, avatarSize, hideRepeatedAvatars, closeChatOnSend, bannerOpacity, bubbleSize, dndEnabled, publicOverlayEnabled,
             publicOverlayIdleSeconds,
+            publicOverlayStyle,
             dndWhisperPlayers,
             channelDietEnabled,
             channelDietMode, channelDietLimit, channelDietDisabledNamespaces,
@@ -215,6 +233,7 @@ public record ChatBubbleConfig(
             panelAnimStyle, bannerAnimStyle, popupAnimStyle, messageAnimStyle, imageRenderEnabled, receiveImages,
             uploadUrl, uploadField, uploadExtra, uploadResponse, messageGap, avatarSize, hideRepeatedAvatars, closeChatOnSend, bannerOpacity, bubbleSize, dndEnabled, publicOverlayEnabled,
             publicOverlayIdleSeconds,
+            publicOverlayStyle,
             dndWhisperPlayers,
             channelDietEnabled,
             channelDietMode, channelDietLimit, channelDietDisabledNamespaces,
@@ -232,6 +251,7 @@ public record ChatBubbleConfig(
             panelAnimStyle, bannerAnimStyle, popupAnimStyle, messageAnimStyle, imageRenderEnabled, receiveImages,
             uploadUrl, uploadField, uploadExtra, uploadResponse, messageGap, avatarSize, hideRepeatedAvatars, closeChatOnSend, bannerOpacity, bubbleSize, dndEnabled, publicOverlayEnabled,
             publicOverlayIdleSeconds,
+            publicOverlayStyle,
             dndWhisperPlayers,
             channelDietEnabled,
             channelDietMode, channelDietLimit, channelDietDisabledNamespaces,
@@ -249,6 +269,7 @@ public record ChatBubbleConfig(
             panelAnimStyle, bannerAnimStyle, popupAnimStyle, messageAnimStyle, imageRenderEnabled, receiveImages,
             uploadUrl, uploadField, uploadExtra, uploadResponse, messageGap, avatarSize, hideRepeatedAvatars, closeChatOnSend, bannerOpacity, bubbleSize, dndEnabled, publicOverlayEnabled,
             publicOverlayIdleSeconds,
+            publicOverlayStyle,
             dndWhisperPlayers,
             channelDietEnabled,
             channelDietMode, channelDietLimit, channelDietDisabledNamespaces,
@@ -269,6 +290,7 @@ public record ChatBubbleConfig(
             this.panelAnimStyle(), this.bannerAnimStyle(), this.popupAnimStyle(), this.messageAnimStyle(), this.imageRenderEnabled(), this.receiveImages(),
             this.uploadUrl(), this.uploadField(), this.uploadExtra(), this.uploadResponse(), this.messageGap(), this.avatarSize(), this.hideRepeatedAvatars(), this.closeChatOnSend(), this.bannerOpacity(), this.bubbleSize(), enabled, this.publicOverlayEnabled(),
             this.publicOverlayIdleSeconds(),
+            this.publicOverlayStyle(),
             this.dndWhisperPlayers(),
             this.channelDietEnabled(),
             this.channelDietMode(), this.channelDietLimit(), this.channelDietDisabledNamespaces(),
@@ -287,6 +309,7 @@ public record ChatBubbleConfig(
             this.panelAnimStyle(), this.bannerAnimStyle(), this.popupAnimStyle(), this.messageAnimStyle(), this.imageRenderEnabled(), this.receiveImages(),
             this.uploadUrl(), this.uploadField(), this.uploadExtra(), this.uploadResponse(), this.messageGap(), this.avatarSize(), this.hideRepeatedAvatars(), this.closeChatOnSend(), this.bannerOpacity(), this.bubbleSize(), this.dndEnabled(), this.publicOverlayEnabled(),
             this.publicOverlayIdleSeconds(),
+            this.publicOverlayStyle(),
             normalizeWhisperDnd(players),
             this.channelDietEnabled(),
             this.channelDietMode(), this.channelDietLimit(), this.channelDietDisabledNamespaces(),
@@ -308,6 +331,7 @@ public record ChatBubbleConfig(
             this.panelAnimStyle(), this.bannerAnimStyle(), this.popupAnimStyle(), this.messageAnimStyle(), this.imageRenderEnabled(), this.receiveImages(),
             this.uploadUrl(), this.uploadField(), this.uploadExtra(), this.uploadResponse(), this.messageGap(), this.avatarSize(), this.hideRepeatedAvatars(), this.closeChatOnSend(), this.bannerOpacity(), this.bubbleSize(), this.dndEnabled(), this.publicOverlayEnabled(),
             this.publicOverlayIdleSeconds(),
+            this.publicOverlayStyle(),
             this.dndWhisperPlayers(),
             enabled,
             this.channelDietMode(), this.channelDietLimit(), this.channelDietDisabledNamespaces(),
@@ -327,6 +351,7 @@ public record ChatBubbleConfig(
             this.panelAnimStyle(), this.bannerAnimStyle(), this.popupAnimStyle(), this.messageAnimStyle(), this.imageRenderEnabled(), this.receiveImages(),
             this.uploadUrl(), this.uploadField(), this.uploadExtra(), this.uploadResponse(), this.messageGap(), this.avatarSize(), this.hideRepeatedAvatars(), this.closeChatOnSend(), this.bannerOpacity(), this.bubbleSize(), this.dndEnabled(), this.publicOverlayEnabled(),
             this.publicOverlayIdleSeconds(),
+            this.publicOverlayStyle(),
             this.dndWhisperPlayers(),
             this.channelDietEnabled(),
             this.channelDietMode(), this.channelDietLimit(),
@@ -346,6 +371,7 @@ public record ChatBubbleConfig(
             this.panelAnimStyle(), this.bannerAnimStyle(), this.popupAnimStyle(), this.messageAnimStyle(), this.imageRenderEnabled(), this.receiveImages(),
             this.uploadUrl(), this.uploadField(), this.uploadExtra(), this.uploadResponse(), this.messageGap(), this.avatarSize(), this.hideRepeatedAvatars(), this.closeChatOnSend(), this.bannerOpacity(), this.bubbleSize(), this.dndEnabled(), this.publicOverlayEnabled(),
             this.publicOverlayIdleSeconds(),
+            this.publicOverlayStyle(),
             this.dndWhisperPlayers(),
             this.channelDietEnabled(),
             this.channelDietMode(), ChannelDietFilter.clampLimit(limit), this.channelDietDisabledNamespaces(),
@@ -376,6 +402,7 @@ public record ChatBubbleConfig(
             this.panelAnimStyle(), this.bannerAnimStyle(), this.popupAnimStyle(), this.messageAnimStyle(), this.imageRenderEnabled(), this.receiveImages(),
             this.uploadUrl(), this.uploadField(), this.uploadExtra(), this.uploadResponse(), this.messageGap(), this.avatarSize(), this.hideRepeatedAvatars(), this.closeChatOnSend(), this.bannerOpacity(), this.bubbleSize(), this.dndEnabled(), this.publicOverlayEnabled(),
             this.publicOverlayIdleSeconds(),
+            this.publicOverlayStyle(),
             this.dndWhisperPlayers(),
             this.channelDietEnabled(),
             this.channelDietMode(), this.channelDietLimit(), this.channelDietDisabledNamespaces(),
