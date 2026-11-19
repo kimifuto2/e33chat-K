@@ -235,8 +235,7 @@ public class ChannelDietScreen extends Screen {
     @Override
     public void render(DrawContext g, int mouseX, int mouseY, float partialTick) {
         // CONFIG_BG 烘焙为 75% 不透明，走带 alpha 顶点的绘制恢复半透明（同配置屏）
-        ColoredTextureRenderer.drawWithAlpha(g,
-            UiTextureManager.rl(UiElement.CONFIG_BG, Appearance.resolvedTheme()),
+        ThemeSkin.draw(g, UiElement.CONFIG_BG,
             0, 0, width, height, 0xC0 / 255f);
         pane.tick(maxScroll());
 
@@ -344,12 +343,10 @@ public class ChannelDietScreen extends Screen {
         int thumbY = top + (int) ((long) (trackH - thumbH) * pane.offset() / max);
         boolean hovering = mouseX >= trackX() && mouseX < trackX() + SCROLLBAR_W
             && mouseY >= thumbY && mouseY < thumbY + thumbH;
-        ColoredTextureRenderer.drawWithAlpha(g,
-            UiTextureManager.rl(UiElement.SCROLLBAR_TRACK, Appearance.resolvedTheme()),
+        ThemeSkin.draw(g, UiElement.SCROLLBAR_TRACK,
             trackX(), top, SCROLLBAR_W, trackH, 0x40 / 255f);
         int alpha = pane.dragging() ? 0xCC : (hovering ? 0xAA : 0x88);
-        ColoredTextureRenderer.drawWithAlpha(g,
-            UiTextureManager.rl(UiElement.SCROLLBAR_THUMB, Appearance.resolvedTheme()),
+        ThemeSkin.draw(g, UiElement.SCROLLBAR_THUMB,
             trackX(), thumbY, SCROLLBAR_W, thumbH, alpha / 255f);
     }
 
