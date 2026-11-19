@@ -4920,7 +4920,21 @@ if (cmpLogged < 3 && quoteSenderMatches(m, owner.replySender())) {
             cy += getMsgHeight(m);
             prevMsg = m;
         }
-        scrollOffset = Math.max(0, cy - 20);
+        // 引用跳转：不再是瞬移，走一段滚动动画（缓出，距离越远时长越久，120~320ms）。
+        int target = Mth.clamp(cy - 20, 0, maxScroll);
+        int dist = Math.abs(target - scrollOffset);
+        if (dist <= 2) {
+            scrollOffset = target;
+            scrollAnimActive = false;
+        } else {
+            scrollAnimFrom = scrollOffset;
+            scrollAnimTo = target;
+            scrollAnimStart = Util.getMillis();
+            scrollAnimDuration = Mth.clamp(120 + dist / 6, 120, 320);
+            scrollAnimActive = true;
+        }
+        scrollToBottom = false;
+        lastScrollTime = Util.getMillis();
         newMessageCount = 0; hasNewMentionOrQuote = false;
         latestMentionIndex = -1; lastSeenMessageCount = msgs.size();
     }
