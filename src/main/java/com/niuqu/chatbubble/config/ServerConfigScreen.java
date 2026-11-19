@@ -1,5 +1,6 @@
 package com.niuqu.chatbubble.config;
 import com.niuqu.chatbubble.store.ChatMessageStore;
+import com.niuqu.chatbubble.render.ThemeSkin;
 
 import com.niuqu.chatbubble.chat.TemplateMatcher;
 import com.niuqu.chatbubble.input.MouseButtons;
@@ -527,13 +528,11 @@ public class ServerConfigScreen extends Screen {
         int trackH = bot - top;
         int th = sbThumbH(trackH, totalH);
         int ty = sbThumbY(top, trackH, th, offset, maxScroll);
-        ColoredTextureRenderer.drawWithAlpha(g,
-            UiTextureManager.rl(UiElement.SCROLLBAR_TRACK, Appearance.resolvedTheme()),
+        ThemeSkin.draw(g, UiElement.SCROLLBAR_TRACK,
             trackX, top, SCROLLBAR_W, bot - top, 0x40 / 255f);
         int base = dragging ? 0xCC
             : sbHovering((int) mx, (int) my, trackX, ty, th) ? 0xAA : 0x88;
-        ColoredTextureRenderer.drawWithAlpha(g,
-            UiTextureManager.rl(UiElement.SCROLLBAR_THUMB, Appearance.resolvedTheme()),
+        ThemeSkin.draw(g, UiElement.SCROLLBAR_THUMB,
             trackX, ty, SCROLLBAR_W, th, base / 255f);
     }
 
