@@ -15,21 +15,21 @@ import java.util.Map;
  */
 public enum ThemePreset {
     /** 经典暗色（原 dark）。 */
-    DARK("dark", ChatBubbleTheme.ColorMode.DARK, 0x000000, 0.00, 0xFFFFFF, 0.00),
+    DARK("dark", ChatBubbleTheme.ColorMode.DARK, 0x000000, 0.00, 0xFFFFFF, 0.00, 0, 0.00),
     /** 米色浅色（原 light）。 */
-    LIGHT("light", ChatBubbleTheme.ColorMode.LIGHT, 0x000000, 0.00, 0x2D2D1F, 0.00),
+    LIGHT("light", ChatBubbleTheme.ColorMode.LIGHT, 0x000000, 0.00, 0x2D2D1F, 0.00, 0, 0.00),
     /** 午夜蓝：深海军蓝底 + 冷白字。 */
-    MIDNIGHT("midnight", ChatBubbleTheme.ColorMode.DARK, 0xFF17243C, 0.60, 0xFFE6EEFF, 0.28),
+    MIDNIGHT("midnight", ChatBubbleTheme.ColorMode.DARK, 0xFF17243C, 0.60, 0xFFE6EEFF, 0.28, 222, 0.42),
     /** 森野绿：深林绿底 + 微绿白字。 */
-    FOREST("forest", ChatBubbleTheme.ColorMode.DARK, 0xFF16241A, 0.60, 0xFFE9F4E3, 0.28),
+    FOREST("forest", ChatBubbleTheme.ColorMode.DARK, 0xFF16241A, 0.60, 0xFFE9F4E3, 0.28, 110, 0.30),
     /** 深海青：墨青底 + 冰蓝白字。 */
-    OCEAN("ocean", ChatBubbleTheme.ColorMode.DARK, 0xFF102530, 0.62, 0xFFE2F4F8, 0.26),
+    OCEAN("ocean", ChatBubbleTheme.ColorMode.DARK, 0xFF102530, 0.62, 0xFFE2F4F8, 0.26, 192, 0.38),
     /** 极简灰：中性深灰底 + 纯白字（低饱和）。 */
-    MONO("mono", ChatBubbleTheme.ColorMode.DARK, 0xFF262626, 0.45, 0xFFFFFFFF, 0.30),
+    MONO("mono", ChatBubbleTheme.ColorMode.DARK, 0xFF262626, 0.45, 0xFFFFFFFF, 0.30, 0, 0.04),
     /** 樱花粉：藕粉浅底 + 深梅字。 */
-    SAKURA("sakura", ChatBubbleTheme.ColorMode.LIGHT, 0xFFF7E4EA, 0.58, 0xFF3B2430, 0.30),
+    SAKURA("sakura", ChatBubbleTheme.ColorMode.LIGHT, 0xFFF7E4EA, 0.58, 0xFF3B2430, 0.30, 342, 0.30),
     /** 秋褐橙：暖沙浅底 + 深褐字。 */
-    AUTUMN("autumn", ChatBubbleTheme.ColorMode.LIGHT, 0xFFF4E6D4, 0.58, 0xFF3A2A18, 0.30);
+    AUTUMN("autumn", ChatBubbleTheme.ColorMode.LIGHT, 0xFFF4E6D4, 0.58, 0xFF3A2A18, 0.30, 32, 0.34);
 
     private final String key;
     private final ChatBubbleTheme.ColorMode mode;
@@ -37,16 +37,21 @@ public enum ThemePreset {
     private final double bgMix;
     private final int fgTint;
     private final double fgMix;
+    /** 纹理重着色用的目标色相（度）与饱和度；DARK/LIGHT 不重着色。 */
+    private final int hue;
+    private final double sat;
     private ChatBubbleTheme.Colors cached;
 
     ThemePreset(String key, ChatBubbleTheme.ColorMode mode, int bgTint, double bgMix,
-                int fgTint, double fgMix) {
+                int fgTint, double fgMix, int hue, double sat) {
         this.key = key;
         this.mode = mode;
         this.bgTint = bgTint;
         this.bgMix = bgMix;
         this.fgTint = fgTint;
         this.fgMix = fgMix;
+        this.hue = hue;
+        this.sat = sat;
     }
 
     /** 配置里存的值，也是 lang key 后缀（e33chat.theme.&lt;key&gt;）。 */
@@ -59,17 +64,53 @@ public enum ThemePreset {
         return mode;
     }
 
+    /** 是否需要把 UI 纹理重着色（DARK/LIGHT 用原纹理，其余预设按色相/饱和度重绘）。 */
+    public boolean recolorsTextures() {
+        return this != DARK && this != LIGHT;
+    }
+
     /**
-     * 面板纹理上的**覆盖色**（叠在面板/标题/底栏/侧边栏纹理上方的一层半透明色）。
-     *
-     * 纹理是按深/浅两套烘焙的，预设只改颜色不改纹理 —— 若不叠这层，除输入框等
-     * 少数走颜色填充的元素外，面板看起来仍是原来的暗/浅色（樱花粉会与浅色完全一样）。
-     * DARK/LIGHT 两个原预设返回 0（不叠加，保持原观感）。
+     * 单个像素的重着色：保留原明度与 alpha，只把色相换成预设色相、饱和度拉到预设值。
+     * 这样面板纹理的圆角/描边/明暗层次全部保留，但颜色是**真的变了**（不是叠一层滤镜）。
      */
-    public int overlayColor() {
-        if (this == DARK || this == LIGHT) return 0;
-        int a = (mode == ChatBubbleTheme.ColorMode.LIGHT) ? 0x4D : 0x66;
-        return (a << 24) | (bgTint & 0x00FFFFFF);
+    public int recolor(int argb) {
+        int a = (argb >>> 24) & 0xFF;
+        if (a == 0) return argb;
+        double r = ((argb >>> 16) & 0xFF) / 255.0;
+        double g = ((argb >>> 8) & 0xFF) / 255.0;
+        double b = (argb & 0xFF) / 255.0;
+        double max = Math.max(r, Math.max(g, b));
+        double min = Math.min(r, Math.min(g, b));
+        double l = (max + min) / 2.0;
+        double d = max - min;
+        double s0 = (d == 0.0) ? 0.0 : d / (1.0 - Math.abs(2.0 * l - 1.0));
+        // 保留一点原饱和度差异（同一张纹理内部仍有层次），其余拉到预设饱和度
+        double s = Math.min(1.0, s0 * 0.25 + sat * 0.75);
+        // 深色系的纹理本身很暗（l≈0.12），色相变化会被压得几乎看不见：整体提一点明度，
+        // 让「午夜蓝/森野绿」这类预设真正看得出颜色（浅色系不动，本来就是高明度）。
+        if (mode == ChatBubbleTheme.ColorMode.DARK) {
+            l = Math.min(0.92, l * 1.22 + 0.015);
+            s = Math.min(1.0, s * 1.10);
+        }
+        return hslToArgb(a, hue / 360.0, s, l);
+    }
+
+    private static int hslToArgb(int a, double h, double s, double l) {
+        double c = (1.0 - Math.abs(2.0 * l - 1.0)) * s;
+        double hp = h * 6.0;
+        double x = c * (1.0 - Math.abs(hp % 2.0 - 1.0));
+        double r1 = 0, g1 = 0, b1 = 0;
+        if (hp < 1) { r1 = c; g1 = x; }
+        else if (hp < 2) { r1 = x; g1 = c; }
+        else if (hp < 3) { g1 = c; b1 = x; }
+        else if (hp < 4) { g1 = x; b1 = c; }
+        else if (hp < 5) { r1 = x; b1 = c; }
+        else { r1 = c; b1 = x; }
+        double m = l - c / 2.0;
+        int r = (int) Math.round(Math.max(0, Math.min(255, (r1 + m) * 255)));
+        int g = (int) Math.round(Math.max(0, Math.min(255, (g1 + m) * 255)));
+        int b = (int) Math.round(Math.max(0, Math.min(255, (b1 + m) * 255)));
+        return (a << 24) | (r << 16) | (g << 8) | b;
     }
 
     /** 该预设的基准调色板（未套强调色、未套自定义覆盖）。 */

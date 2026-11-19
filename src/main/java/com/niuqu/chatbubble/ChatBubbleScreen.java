@@ -733,7 +733,6 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
 
     private void renderSidebar(DrawContext g, int mouseX, int mouseY, float alpha) {
         ColoredTextureRenderer.drawWithAlpha(g, UiTextureManager.rl(UiElement.SIDEBAR_BG), 0, 0, SIDEBAR_W, height, alpha);
-        if (Appearance.presetOverlay() != 0) g.fill(0, 0, SIDEBAR_W, height, Appearance.presetOverlay());
         ColoredTextureRenderer.drawWithAlpha(g, UiTextureManager.rl(UiElement.DIVIDER), SIDEBAR_W - 1, 0, 1, height, alpha);
 
         int y = 2;
@@ -2637,10 +2636,6 @@ boolean selDrag = textSelection.isDragActive();
         }
         ColoredTextureRenderer.drawWithAlpha(g, UiTextureManager.rl(UiElement.PANEL_BG),
             fillLeft, 0, panelX + panelW - fillLeft, height, panelOpacity);
-        // 预设主题：在烘焙纹理上叠一层预设色相，否则除输入框外看起来仍是原暗/浅色
-        if (Appearance.presetOverlay() != 0) {
-            g.fill(fillLeft, 0, panelX + panelW, height, Appearance.presetOverlay());
-        }
 
         // 上下栏背景只跟开合动画（fade 终点 1.0 不透明），不乘 PANEL_OPACITY ?.3.7 起永久半透明回归
         renderTitleBar(g, mouseX, mouseY, getBarAlpha());
@@ -2737,7 +2732,6 @@ boolean selDrag = textSelection.isDragActive();
         // opacity made icons/text lighter on light themes).
         int c255 = (int) (255 * getAnimProgress());
         ColoredTextureRenderer.drawWithAlpha(g, UiTextureManager.rl(UiElement.TITLE_BAR), panelX, ty, panelW, TITLE_H, panelAlpha);
-        if (Appearance.presetOverlay() != 0) g.fill(panelX, ty, panelX + panelW, ty + TITLE_H, Appearance.presetOverlay());
         ColoredTextureRenderer.drawWithAlpha(g, UiTextureManager.rl(UiElement.DIVIDER), panelX, ty + TITLE_H, panelW, 1, panelAlpha);
 
         int menuX = panelX + 3;
@@ -4375,9 +4369,6 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
         float panelBgAlpha = (c().panelBg() >>> 24) / 255f;
         ColoredTextureRenderer.drawWithAlpha(g, UiTextureManager.rl(UiElement.PANEL_BG),
             barX, barY, barW, barTop - notifOffset - barY, panelBgAlpha);
-        if (Appearance.presetOverlay() != 0) {
-            g.fill(barX, barY, barX + barW, barTop - notifOffset, Appearance.presetOverlay());
-        }
         ColoredTextureRenderer.drawWithAlpha(g, UiTextureManager.rl(UiElement.DIVIDER), barX, barTop - notifOffset - 1, barW, 1, getAnimProgress());
 
         String sender = target.senderName().getString();

@@ -16,7 +16,9 @@ public final class UiTextureManager {
 
     /** 当前配置主题下元素的纹理 ID。 */
     public static Identifier rl(UiElement el) {
-        return el.rl(currentTheme());
+        // 预设主题（非 dark/light）：纹理按当前预设的色相/饱和度在内存重绘后返回动态 ID，
+        // 这样面板等纹理是**真的换色**，而不是叠一层半透明滤镜。
+        return com.niuqu.chatbubble.render.ThemeTextureTinter.resolve(el.rl(currentTheme()));
     }
 
     /** 指定主题下元素的纹理 ID（配置界面等固定主题场景使用）。*/
