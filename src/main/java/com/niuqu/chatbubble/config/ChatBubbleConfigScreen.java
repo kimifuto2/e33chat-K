@@ -101,6 +101,8 @@ public class ChatBubbleConfigScreen extends Screen {
     private boolean publicOverlayEnabled;
     /** 公屏小窗静默淡出秒数（1~60，默认 5）。 */
     private int publicOverlayIdleSeconds = 5;
+    /** 公屏小窗样式（a/b/c/d），默认 c。 */
+    private String publicOverlayStyle = ChatBubbleConfig.PUBLIC_OVERLAY_STYLE_DEFAULT;
     private boolean blurEnabled, ownMentionNotify, ownQuoteNotify, ownWhisperNotify;
     private int mentionBannerDuration, timeSeparatorMinutes;
     private int panelWidth, bubbleCornerRadius, panelOpacity, soundVolume, bannerCornerRadius, bannerOpacity;
@@ -238,6 +240,7 @@ public class ChatBubbleConfigScreen extends Screen {
             ChatBubbleClientSetup.config().uploadResponse(),
             messageGap, avatarSize, hideRepeatedAvatars, closeChatOnSend, bannerOpacity, bubbleSize, dndEnabled, publicOverlayEnabled,
             publicOverlayIdleSeconds,
+            publicOverlayStyle,
             // 私聊免打扰名单不在本屏编辑（开关是聊天窗口标题栏那颗月亮按钮：
             // 在私聊视图下点它切换的就是当前对象的 DND），
             // 保存时必须原样带回，否则"改任何一个设置"都会把名单清空。
@@ -281,6 +284,7 @@ public class ChatBubbleConfigScreen extends Screen {
         // 可空：旧配置文件没有这个键 → 视为默认 5 秒
         publicOverlayIdleSeconds = cfg.publicOverlayIdleSeconds() != null
             ? cfg.publicOverlayIdleSeconds() : ChatBubbleConfig.PUBLIC_OVERLAY_IDLE_DEFAULT_SECONDS;
+        publicOverlayStyle = ChatBubbleConfig.normalizeOverlayStyle(cfg.publicOverlayStyle());
         blurEnabled = cfg.blurEnabled(); panelOpacity = cfg.panelOpacity();
         soundVolume = cfg.soundVolume();
         ownMentionNotify = cfg.ownMentionNotify(); ownQuoteNotify = cfg.ownQuoteNotify();
@@ -420,7 +424,7 @@ public class ChatBubbleConfigScreen extends Screen {
     // / 色板点击全部由注册表派生，杜绝手写清单漂移。
     // Fabric 无 ModConfigSpec：Ref 是字段的 getter/setter 对（Screen 的 mutable copies）。
     // 注册表引实例字段，故非 static；lambda 惰性求值，loadFromConfig 前只建引用。
-    private enum Kind { BOOL, INT, SLIDER, HEX, TEXT, PATTERN, ENUM_CYCLE, ACCENT_CYCLE, THEME_CYCLE, TIME_SEP, OPEN_SCREEN }
+    private enum Kind { BOOL, INT, SLIDER, HEX, TEXT, PATTERN, ENUM_CYCLE, OVERLAY_STYLE, ACCENT_CYCLE, THEME_CYCLE, TIME_SEP, OPEN_SCREEN }
 
     private record Ref<T>(java.util.function.Supplier<T> getter, java.util.function.Consumer<T> setter) {
         static Ref<Boolean> b(java.util.function.BooleanSupplier g, java.util.function.Consumer<Boolean> s) {
@@ -459,6 +463,9 @@ public class ChatBubbleConfigScreen extends Screen {
         }
         static OptionDef enumCycle(String key, Ref<String> r) {
             return new OptionDef(key, Kind.ENUM_CYCLE, r, 0, 0, 0, null);
+        }
+        static OptionDef overlayStyle(String key, Ref<String> r) {
+            return new OptionDef(key, Kind.OVERLAY_STYLE, r, 0, 0, 0, null);
         }
         static OptionDef themeCycle(String key, Ref<ChatBubbleTheme> r) {
             return new OptionDef(key, Kind.THEME_CYCLE, r, 0, 0, 0, null);
@@ -520,7 +527,10 @@ public class ChatBubbleConfigScreen extends Screen {
             OptionDef.intBox("e33chat.config.public_overlay_idle_seconds",
                 Ref.i(() -> publicOverlayIdleSeconds, v -> publicOverlayIdleSeconds = v),
                 ChatBubbleConfig.PUBLIC_OVERLAY_IDLE_MIN_SECONDS,
-                ChatBubbleConfig.PUBLIC_OVERLAY_IDLE_MAX_SECONDS, 2))
+                ChatBubbleConfig.PUBLIC_OVERLAY_IDLE_MAX_SECONDS, 2),
+            // 小窗样式：A 纯文字 / B 半透明面板 / C 每行气泡 / D 单行跑马灯（默认 C）
+            OptionDef.overlayStyle("e33chat.config.public_overlay_style",
+                Ref.s(() -> publicOverlayStyle, v -> publicOverlayStyle = v)))
     );
 
     private final List<SectionDef> NOTIFY_SECTIONS = List.of(
@@ -673,6 +683,10 @@ public class ChatBubbleConfigScreen extends Screen {
                 Ref<String> r = (Ref<String>) d.ref();
                 yield new Opt(d.key(), y -> mkStyleButton(y, r.getter(), r.setter()), d.previewColor(), d.ref());
             }
+            case OVERLAY_STYLE -> {
+                Ref<String> r = (Ref<String>) d.ref();
+                yield new Opt(d.key(), y -> mkOverlayStyleButton(y, r.getter(), r.setter()), d.previewColor(), d.ref());
+            }
             case THEME_CYCLE -> new Opt(d.key(), this::mkThemeButton, d.previewColor(), d.ref());
             case ACCENT_CYCLE -> new Opt(d.key(), this::mkAccentButton, d.previewColor(), d.ref());
             case TIME_SEP -> new Opt(d.key(), this::mkTimeSepButton, d.previewColor(), d.ref());
@@ -802,6 +816,20 @@ public class ChatBubbleConfigScreen extends Screen {
                 int next = (java.util.Arrays.asList(values).indexOf(AnimationStyle.valueOf(getter.get().toUpperCase())) + 1) % values.length;
                 setter.accept(values[next].name().toLowerCase());
                 btn.setMessage(Text.translatable("e33chat.config.anim_style." + getter.get()));
+            }
+        ).position(inputX, y).size(INPUT_W, 20).build();
+    }
+
+    // 公屏小窗样式循环按钮（A → B → C → D → A ...）
+    private ButtonWidget mkOverlayStyleButton(int y, java.util.function.Supplier<String> getter, java.util.function.Consumer<String> setter) {
+        return ButtonWidget.builder(
+            Text.translatable("e33chat.config.overlay_style." + getter.get()),
+            btn -> {
+                com.niuqu.chatbubble.render.PublicOverlayStyle[] values = com.niuqu.chatbubble.render.PublicOverlayStyle.values();
+                int idx = java.util.Arrays.asList(values).indexOf(
+                    com.niuqu.chatbubble.render.PublicOverlayStyle.parse(getter.get()));
+                setter.accept(values[(idx + 1) % values.length].key());
+                btn.setMessage(Text.translatable("e33chat.config.overlay_style." + getter.get()));
             }
         ).position(inputX, y).size(INPUT_W, 20).build();
     }
