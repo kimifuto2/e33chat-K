@@ -253,7 +253,9 @@ public final class PublicChatOverlay {
         for (int i = 0; i < n; i++) {
             View v = shown.get(i);
             int w = PAD * 2;
-            for (String line : v.lines) w = Math.max(w, tr.getWidth(line) + v.indent);
+            // 注意必须把首行「名字」占的 indent 与左右内边距 PAD*2 一起算进去：
+            // 只算文本宽度会让气泡比文字窄一个内边距，末字顶出气泡外。
+            for (String line : v.lines) w = Math.max(w, tr.getWidth(line) + v.indent + PAD * 2);
             widths[i] = Math.max(BUBBLE_MIN_W, Math.min(panelW, w));
             heights[i] = v.rows() * lineH + BUBBLE_PAD_V * 2;
             total += heights[i] + (i > 0 ? BUBBLE_GAP : 0);
@@ -286,7 +288,9 @@ public final class PublicChatOverlay {
         if (shown.isEmpty()) return;
         View v = shown.get(shown.size() - 1);
 
-        String text = v.lines.isEmpty() ? v.name : v.lines.get(0);
+        // 单行跑马灯：只画首行，超出可用宽度的部分用 "..." 省略（不再让字被气泡边缘切一半）。
+        String text = ellipsize(tr,
+            v.lines.isEmpty() ? v.name : v.lines.get(0), panelW - PAD * 2 - v.indent);
         int w = Math.min(panelW, tr.getWidth(text) + v.indent + PAD * 2);
         int h = lineH + BUBBLE_PAD_V * 2;
         int top = iconY - GAP_ABOVE_ICON - h;
@@ -299,7 +303,12 @@ public final class PublicChatOverlay {
                 ChatBubbleTheme.alphaBlend(c.popupBg(), Math.min(255, a255)));
         }
         g.enableScissor(x, blockTop, x + panelW, blockTop + h);
-        drawView(g, tr, c, v, x + PAD, blockTop + BUBBLE_PAD_V, lineH, a);
+        if (a255 > 0) {
+            g.drawText(tr, v.name, x + PAD, blockTop + BUBBLE_PAD_V,
+                ChatBubbleTheme.alphaBlend(c.nameColor(), a255), false);
+            g.drawText(tr, text, x + PAD + v.indent, blockTop + BUBBLE_PAD_V,
+                ChatBubbleTheme.alphaBlend(c.textPrimary(), a255), false);
+        }
         g.disableScissor();
     }
 
@@ -386,6 +395,17 @@ public final class PublicChatOverlay {
             }
         }
         return y + v.rows() * lineH;
+    }
+
+    /** 把文本裁剪到 maxW 内：超出的字符用 "..." 结尾（样式 D 的省略号）。 */
+    private static String ellipsize(TextRenderer tr, String text, int maxW) {
+        if (text == null || text.isEmpty() || maxW <= 0) return text == null ? "" : text;
+        if (tr.getWidth(text) <= maxW) return text;
+        int ell = tr.getWidth("...");
+        int avail = Math.max(0, maxW - ell);
+        int end = text.length();
+        while (end > 0 && tr.getWidth(text.substring(0, end)) > avail) end--;
+        return text.substring(0, end) + "...";
     }
 
     /** 样式 A 专用：与 {@link #drawView} 相同，但文字带阴影（无底板时保证可读）。 */

@@ -539,9 +539,19 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
         layoutInputField();
     }
 
+    /** 输入框宽度里给「光标」预留的一个字母宽度。
+     *
+     *  <p>TextFieldWidget 关掉背景（{@code setDrawsBackground(false)}）后
+     *  {@code getInnerWidth()} 不再减 8，光标会被 clamp 到 {@code x + width} ——
+     *  也就是输入框最右边。长文本时它正好压在圆角边框上/溢出边框外。这里把文本区
+     *  收窄一个字母宽、同时把底板加宽同样的量（见 {@code drawInputBar} 的 pillW），
+     *  于是总视觉宽度不变、光标永远停在底板内侧。
+     */
+    private static final int INPUT_CURSOR_RESERVE = 6;
+
     /** 输入框宽度的唯一算法（窄窗口下不能算出 0/负值，见 {@link #MIN_INPUT_W}）。 */
     private int inputFieldWidth(int inputX, int sendX) {
-        return Math.max(MIN_INPUT_W, sendX - ICON_S - 8 - inputX);
+        return Math.max(MIN_INPUT_W, sendX - ICON_S - 8 - inputX - INPUT_CURSOR_RESERVE);
     }
 
     /** 底栏输入框**本体**的左边界（不含已选动作前缀）；绘制与布局都从这里取值。 */
@@ -4509,8 +4519,9 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
 
         int ibX = inputBaseX();
         int ibY = inputBarY();
-        // 输入框本体宽 = 文字框宽（动作前缀已经是文本内容，不再额外占宽）。
-        int ibW = chatField.getWidth();
+        // 输入框本体宽 = 文字框宽 + 右侧给光标预留的一个字母宽（见 INPUT_CURSOR_RESERVE：
+        // 文本区收窄、底板补回，总视觉宽度不变，光标不会再压到圆角边框外）。
+        int ibW = chatField.getWidth() + INPUT_CURSOR_RESERVE;
         int ibH = inputBarH();
         // Rounded input box with a subtle border. Radius uses the same set as the
         // bottom-bar icon buttons (drawIconButton: outer ring 6f + 1px inset 5f) so the
