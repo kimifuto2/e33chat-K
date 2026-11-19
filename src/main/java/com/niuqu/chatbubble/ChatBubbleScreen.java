@@ -4639,12 +4639,13 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
         if (owner < 0) return false;
         int target = resolveQuoteTarget(owner);
         if (target >= 0) {
-            int before = scrollOffset;
-            jumpToMessage(target);
-            // 抑制「自动滚到底」和仍在跑的滚动动画：下一 ?renderMessages 会读这两个开关，
-            // 不关掉的话刚跳到的位置会被立刻拉回底 ?/ 被动画值覆盖
+            // 先关掉「自动滚到底」和还在跑的旧滚动动画，**再**让 jumpToMessage 起一段跳转动画。
+            // 顺序不能反：之前是在 jumpToMessage 之后把 scrollAnimActive 置 false，
+            // 等于把刚起的那段跳转动画立刻掐掉 → 双击引用完全不跳。
             scrollToBottom = false;
             scrollAnimActive = false;
+            int before = scrollOffset;
+            jumpToMessage(target);
             lastScrollTime = Util.getMeasuringTimeMs();
             quoteFlashMsg = ChatMessageStore.getMessages().get(target);
             quoteFlashStart = Util.getMeasuringTimeMs();
