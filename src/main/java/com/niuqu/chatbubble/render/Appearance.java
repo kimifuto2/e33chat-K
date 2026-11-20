@@ -25,6 +25,31 @@ public final class Appearance {
         return ChatBubbleTheme.resolveFrom(ThemeRegistry.current().colors(), accent, custom);
     }
 
+    /** 有效气泡色：主题自带默认值优先（仅当玩家未自定义时），否则用玩家配置。 */
+    public record Bubbles(int ownBg, int ownText, int otherBg, int otherText) {}
+
+    public static Bubbles bubbles() {
+        ChatBubbleConfig cfg = ChatBubbleClientSetup.config();
+        ChatBubbleConfig def = ChatBubbleConfig.defaults();
+        int ownBg = parseHexOr(cfg.ownBubbleColor(), 0xFF1E90FF);
+        int ownText = parseHexOr(cfg.ownTextColor(), 0xFFFFFFFF);
+        int otherBg = parseHexOr(cfg.otherBubbleColor(), snapshot().contextHover());
+        int otherText = parseHexOr(cfg.otherTextColor(), snapshot().textPrimary());
+        ThemePalette.BubbleColors pb = ThemeRegistry.current().bubbles();
+        if (pb != null) {
+            if (ownBg == parseHexOr(def.ownBubbleColor(), 0xFF1E90FF)) ownBg = pb.ownBg();
+            if (ownText == parseHexOr(def.ownTextColor(), 0xFFFFFFFF)) ownText = pb.ownText();
+            if (otherBg == parseHexOr(def.otherBubbleColor(), 0xFF000000)) otherBg = pb.otherBg();
+            if (otherText == parseHexOr(def.otherTextColor(), 0xFF000000)) otherText = pb.otherText();
+        }
+        return new Bubbles(ownBg, ownText, otherBg, otherText);
+    }
+
+    private static int parseHexOr(String s, int fallback) {
+        Integer v = parseHex(s);
+        return v != null ? v : fallback;
+    }
+
     /** 自定义配色：字段名→ARGB，非法值丢弃。 */
     private static Map<String, Integer> parseCustom(Map<String, String> custom) {
         if (custom == null || custom.isEmpty()) return Map.of();
