@@ -50,9 +50,10 @@ public final class Appearance {
         return v != null ? v : fallback;
     }
 
-    /** 配置屏/子界面的“深色 chrome”配色：固定用深色主题一套。 */
+    /** 配置屏/子界面配色：跟随当前主题；仅浅色主题（深字）在深色幕布上改用深色主题那套浅字。 */
     public static ChatBubbleTheme.Colors configChrome() {
-        return ChatBubbleTheme.DARK.colors();
+        return ThemeRegistry.current().mode() == ThemeMode.LIGHT
+            ? ChatBubbleTheme.DARK.colors() : snapshot();
     }
 
     /** 自定义配色：字段名→ARGB，非法值丢弃。 */
