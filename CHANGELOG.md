@@ -3,6 +3,7 @@
 ## v3.1.5（1.21.11 Fabric 版：恢复命令用法提示）
 
 **修复**
+- **配置屏滚动条拖动不跟手**：`SmoothScrollPane.dragTo` 每次 mouseDragged 都重开一个 80ms 补间，滑块永远慢半拍；现改为拖动时直接落位并取消补间（滚轮仍保留平滑动画），三个设置界面的滚动条都 1:1 跟手
 - **命令用法提示行不显示**：`ChatInputSuggestorMixin` 此前把 `ChatInputSuggestor.renderMessages`（原版画「命令用法 / 报错」提示行的入口）整个 cancel，导致本屏只有候选列表、没有用法提示。现已删掉该 cancel —— 候选列表（`ChatInputSuggestor.render → tryRenderWindow`）与用法提示都恢复原版行为，候选列表位置仍由 mixin 调整到输入框正上方
 
 **其它**
