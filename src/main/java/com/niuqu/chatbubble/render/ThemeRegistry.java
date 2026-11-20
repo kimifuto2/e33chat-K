@@ -11,9 +11,9 @@ import java.util.Map;
 /**
  * 主题注册表：id → {@link ThemePalette}。
  *
- * <p>阶段 1 只注册 dark/light 两条（行为与改造前完全一致）；后续阶段可继续
- * {@link #register} 新的配色，配置里存的就是 palette id。
- * 未知 id 回退到按明暗模式匹配的默认主题（保持旧配置兼容）。
+ * <p>dark/light 保留原有纹理观感；{@code sakura} 是第一个「代码皮肤」主题
+ * （assets = null，颜色全部手写，不依赖烘焙纹理）。
+ * 未知配置 id 回退到按明暗模式匹配的默认主题（兼容旧配置）。
  */
 public final class ThemeRegistry {
 
@@ -24,6 +24,9 @@ public final class ThemeRegistry {
                 ChatBubbleTheme.DARK.colors(), ThemeAssets.of("dark")));
         register(new ThemePalette("light", ThemeMode.LIGHT, "e33chat.theme.light", 1,
                 ChatBubbleTheme.LIGHT.colors(), ThemeAssets.of("light")));
+        register(new ThemePalette("sakura", ThemeMode.LIGHT, "e33chat.theme.sakura", 2,
+                sakuraColors(), null,
+                new ThemePalette.BubbleColors(0xFFC2407A, 0xFFFFF5F8, 0xFFF6E1E7, 0xFF3A2830)));
     }
 
     private ThemeRegistry() {}
@@ -34,7 +37,6 @@ public final class ThemeRegistry {
         }
     }
 
-    /** 当前配置的主题；未知 id（含旧值的大小写变体）按明暗模式回退。 */
     public static ThemePalette current() {
         return byId(ChatBubbleClientSetup.config().theme());
     }
@@ -53,5 +55,53 @@ public final class ThemeRegistry {
         List<ThemePalette> list = new ArrayList<>(PALETTES.values());
         list.sort(Comparator.comparingInt(ThemePalette::sortOrder));
         return list;
+    }
+
+    /** 樱花粉：浅色底 + 粉调面板，文字用深玫瑰灰保证对比度。 */
+    private static ChatBubbleTheme.Colors sakuraColors() {
+        return new ChatBubbleTheme.Colors(
+            0xFFF7E9EC, // panelBg
+            0xFFFBEFF2, // titleBg
+            0xFFF2DDE3, // barBg
+            0xFFF3E1E6, // sidebarBg
+            0xFFEFD2DC, // sidebarItemHover
+            0xFFE8BFCE, // sidebarItemSelected
+            0xFFE3CBD3, // sidebarDivider
+            0xFFE6CFD6, // divider
+            0xFFFBF2F4, // inputBg
+            0xFF3A2830, // textPrimary
+            0xFF6B4E5A, // textSecondary
+            0xFF9C7C88, // textMuted
+            0xFFC2407A, // nameColor
+            0xFFA9848F, // timeColor
+            0xFFFBF0F3, // popupBg
+            0xFFF3D9E1, // popupHover
+            0xFF3A2830, // popupText
+            0xFFFBF0F3, // contextBg
+            0xFFF0D3DC, // contextHover
+            0xFF3A2830, // contextText
+            0xFFEAC3D0, // iconHover
+            0xFFC2407A, // notificationText
+            0xFFE9C2CE, // whisperBar
+            0xFF4A2A36, // toastBg
+            0xFFFBEDF1, // toastText
+            0xFFD9AEBE, // scrollbar
+            0xFFC98CA1, // scrollbarHover
+            0xFFE8CBD4, // closeBg
+            0xFFD9A2B4, // closeHoverBg
+            0xFF3A2830, // closeText
+            0xFF8A6A76, // systemText
+            0xFFC2407A, // quoteBar
+            0xFFC2407A, // duplicateLabel
+            0xFFE23D6D, // redDot
+            0xFFFF2D6E, // redDotMention
+            0xFFC2407A, // configTitle
+            0xFFB33A6B, // configSection
+            0xFF3A2830, // configLabel
+            0xFFF7E9EC, // configBg
+            0xFFF3D9E1, // bannerBg
+            0xFF3A2830, // bannerText
+            0xFFC2407A  // bannerBar
+        );
     }
 }

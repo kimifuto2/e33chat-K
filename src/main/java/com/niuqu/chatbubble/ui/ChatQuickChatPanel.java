@@ -1,5 +1,6 @@
 package com.niuqu.chatbubble.ui;
 import com.niuqu.chatbubble.ChatBubbleClientSetup;
+import com.niuqu.chatbubble.render.SkinRenderer;
 import com.niuqu.chatbubble.texture.UiTextureManager;
 import com.niuqu.chatbubble.texture.ColoredTextureRenderer;
 import com.niuqu.chatbubble.render.ChatBubbleTheme;
@@ -91,10 +92,9 @@ public class ChatQuickChatPanel {
             int delX = hoverRight - 13;
             int delY = rowY + 1;
             boolean hoverDel = mouseX >= delX && mouseX <= delX + 12 && mouseY >= delY && mouseY <= delY + 12;
-            com.niuqu.chatbubble.texture.ColoredTextureRenderer.drawWithAlpha(g,
-                com.niuqu.chatbubble.texture.UiTextureManager.rl(hoverDel
+            SkinRenderer.draw(g, hoverDel
                     ? com.niuqu.chatbubble.texture.UiElement.CLOSE_HOVER
-                    : com.niuqu.chatbubble.texture.UiElement.CLOSE_BG),
+                    : com.niuqu.chatbubble.texture.UiElement.CLOSE_BG,
                 delX, delY, 12, 12, alpha);
             g.drawText(font, "✕", delX + 6 - font.getWidth("✕") / 2, delY + 2, com.niuqu.chatbubble.render.ChatBubbleTheme.alphaBlend(c.closeText(), a255), false);
         }
