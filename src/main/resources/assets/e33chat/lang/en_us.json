@@ -13,7 +13,7 @@
   "e33chat.config.cat.sidebar": "Sidebar",
   "e33chat.config.cat.advanced": "Advanced",
   "e33chat.config.theme": "Color Theme",
-  "e33chat.config.theme.desc": "Switch the chat panel color theme (Dark / Light)",
+  "e33chat.config.theme.desc": "Switch the chat panel color theme (Dark / Light / Sakura Pink)",
   "e33chat.theme.dark": "Dark",
   "e33chat.theme.sakura": "Sakura Pink",
   "e33chat.theme.light": "Light",
