@@ -1,5 +1,6 @@
 package com.niuqu.chatbubble.config;
 import com.niuqu.chatbubble.store.ChatMessageStore;
+import com.niuqu.chatbubble.render.SkinRenderer;
 
 import com.niuqu.chatbubble.chat.TemplateMatcher;
 import com.niuqu.chatbubble.input.MouseButtons;
@@ -527,14 +528,10 @@ public class ServerConfigScreen extends Screen {
         int trackH = bot - top;
         int th = sbThumbH(trackH, totalH);
         int ty = sbThumbY(top, trackH, th, offset, maxScroll);
-        ColoredTextureRenderer.drawWithAlpha(g,
-            UiTextureManager.rl(UiElement.SCROLLBAR_TRACK, Appearance.resolvedTheme()),
-            trackX, top, SCROLLBAR_W, bot - top, 0x40 / 255f);
+        SkinRenderer.draw(g, com.niuqu.chatbubble.texture.UiElement.SCROLLBAR_TRACK, trackX, top, SCROLLBAR_W, bot - top, 0x40 / 255f);
         int base = dragging ? 0xCC
             : sbHovering((int) mx, (int) my, trackX, ty, th) ? 0xAA : 0x88;
-        ColoredTextureRenderer.drawWithAlpha(g,
-            UiTextureManager.rl(UiElement.SCROLLBAR_THUMB, Appearance.resolvedTheme()),
-            trackX, ty, SCROLLBAR_W, th, base / 255f);
+        SkinRenderer.draw(g, com.niuqu.chatbubble.texture.UiElement.SCROLLBAR_THUMB, trackX, ty, SCROLLBAR_W, th, base / 255f);
     }
 
     private void drawTriangle(UiCanvas g, int x, int y, boolean down, int color) {
@@ -631,8 +628,7 @@ public class ServerConfigScreen extends Screen {
     @Override
     public void extractRenderState(GuiGraphicsExtractor raw, int mouseX, int mouseY, float partialTick) {
         UiCanvas g = UiCanvas.of(raw);
-        g.drawTexture(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED, UiTextureManager.rl(UiElement.CONFIG_BG, Appearance.resolvedTheme()),
-            0, 0, 0f, 0f, width, height, 16, 16, 16, 16);
+        SkinRenderer.draw(g, com.niuqu.chatbubble.texture.UiElement.CONFIG_BG, 0, 0, width, height, 1f);
         tickAnims();
         g.drawText(font, title, width / 2 - font.width(title) / 2, 14, c().configTitle(), false);
 
@@ -645,8 +641,7 @@ public class ServerConfigScreen extends Screen {
             boolean sel = i == selectedCat;
             boolean hover = mouseX >= CAT_X && mouseX <= CAT_X + CAT_W && mouseY >= ly && mouseY < ly + CAT_ROW_H;
             if (sel || hover)
-                g.drawTexture(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED, UiTextureManager.rl(UiElement.HOVER_BG, Appearance.resolvedTheme()),
-                    CAT_X, ly, 0f, 0f, CAT_W, CAT_ROW_H, 16, 16, 16, 16);
+                SkinRenderer.draw(g, com.niuqu.chatbubble.texture.UiElement.HOVER_BG, CAT_X, ly, CAT_W, CAT_ROW_H, 1f);
             if (sel)
                 g.fill(CAT_X, ly, CAT_X + 2, ly + CAT_ROW_H, c().configTitle());
             g.drawText(font, Component.translatable(CAT_KEYS[i]), CAT_X + 18, ly + (CAT_ROW_H - 8) / 2,
@@ -658,8 +653,7 @@ public class ServerConfigScreen extends Screen {
             mouseX, mouseY, treePane.dragging());
 
         // 分类与选项区分隔线
-        g.drawTexture(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED, UiTextureManager.rl(UiElement.DIVIDER, Appearance.resolvedTheme()),
-            dividerX(), START_Y - 6, 0f, 0f, 1, viewBottom() - (START_Y - 6), 16, 16, 16, 16);
+        SkinRenderer.draw(g, com.niuqu.chatbubble.texture.UiElement.DIVIDER, dividerX(), START_Y - 6, 1, viewBottom() - (START_Y - 6), 1f);
 
         // 右区选项行，硬裁剪到视口；普通行 label 垂直居中对齐按钮（y+6），教程小行顶部对齐（y+2）
         g.enableScissor(optLabelX() - 4, viewTop(), width, viewBottom());
@@ -672,8 +666,7 @@ public class ServerConfigScreen extends Screen {
                 int lineX = optLabelX() + font.width(label) + 8;
                 int lineEnd = optLabelX() + optAreaW() + 4;
                 if (lineX < lineEnd)
-                    g.drawTexture(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED, UiTextureManager.rl(UiElement.DIVIDER, Appearance.resolvedTheme()),
-                        lineX, y + 15, 0f, 0f, lineEnd - lineX, 1, 16, 16, 16, 16);
+                    SkinRenderer.draw(g, com.niuqu.chatbubble.texture.UiElement.DIVIDER, lineX, y + 15, lineEnd - lineX, 1, 1f);
                 y += row.height();
                 continue;
             }
