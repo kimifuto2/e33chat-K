@@ -196,7 +196,7 @@ dependencies {
 - **免打扰（DND）**
   - 左上角月亮按钮，**按会话独立**：公屏一份，每个私聊各自一份
   - 进入私聊视图时，同一按钮自动切换为「该私聊」的开关
-  - 免打扰时：不弹灵动岛横幅、静默非 @ 提示音；**@提及 / 引用始终提醒**；**左下角红点保留**
+  - 免打扰时：不弹通知横幅（@ / 系统）、静默非 @ 提示音；**@提及 / 引用始终提醒**；**左下角红点保留**
   - 玩家列表中被免打扰的玩家显示**紫色月亮**，名字过长自动截断并加 `...`
 - **公屏消息小窗**（聊天面板关闭时）
   - 左下角聊天图标上方显示最近 3 条公屏消息
@@ -286,8 +286,8 @@ java.lang.IllegalStateException: Cannot register channel. Too many channel regis
 | `publicOverlayEnabled` | 公屏消息小窗开关 |
 | `publicOverlayIdleSeconds` | 小窗静默淡出秒数（1~60） |
 | `redDotEnabled` | 左下角聊天图标红点 |
-| `mentionBannerEnabled` / `systemBannerEnabled` | 灵动岛横幅开关 |
-| `musicIslandEnabled` | 音乐横幅（需装 DangoMusic，默认开） |
+| `mentionBannerEnabled` / `systemBannerEnabled` | **通知横幅**开关：被 @ 提醒 / 系统消息（死亡、进入、广播）以顶部横幅弹出（与音乐横幅共用同一视觉容器，但独立开关） |
+| `musicIslandEnabled` | **音乐横幅**（灵动岛 × DangoMusic：封面/曲名/艺术家/播放时间；需装 DangoMusic，默认开） |
 
 ---
 
