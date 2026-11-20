@@ -138,12 +138,7 @@ public enum ChatBubbleTheme {
      */
     public static Colors resolve(ColorMode mode, Accent accent, Map<String, Integer> custom) {
         ChatBubbleTheme base = (mode == ColorMode.LIGHT) ? LIGHT : DARK;
-        return resolveFrom(base.colors(), accent, custom);
-    }
-
-    /** 以给定基色（来自 ThemePalette）解析：强调色混合 → themeCustom 覆盖。 */
-    public static Colors resolveFrom(Colors baseColors, Accent accent, Map<String, Integer> custom) {
-        Colors b = baseColors;
+        Colors b = base.colors();
         // 自定义强调色优先（custom["accent"]），否则用预设 accent。
         int a = accent.rgb;
         if (custom != null && custom.containsKey("accent")) {
