@@ -2,7 +2,6 @@ package com.niuqu.chatbubble.config;
 
 import com.mojang.logging.LogUtils;
 import com.niuqu.chatbubble.ChatBubbleClientSetup;
-import com.niuqu.chatbubble.render.ThemeSkin;
 import com.niuqu.chatbubble.channeldiet.ChannelDietFilter;
 import com.niuqu.chatbubble.channeldiet.ChannelDietNames;
 import com.niuqu.chatbubble.channeldiet.ChannelDietStats;
@@ -235,7 +234,8 @@ public class ChannelDietScreen extends Screen {
     @Override
     public void render(DrawContext g, int mouseX, int mouseY, float partialTick) {
         // CONFIG_BG 烘焙为 75% 不透明，走带 alpha 顶点的绘制恢复半透明（同配置屏）
-        ThemeSkin.draw(g, UiElement.CONFIG_BG,
+        ColoredTextureRenderer.drawWithAlpha(g,
+            UiTextureManager.rl(UiElement.CONFIG_BG, Appearance.resolvedTheme()),
             0, 0, width, height, 0xC0 / 255f);
         pane.tick(maxScroll());
 
@@ -343,10 +343,12 @@ public class ChannelDietScreen extends Screen {
         int thumbY = top + (int) ((long) (trackH - thumbH) * pane.offset() / max);
         boolean hovering = mouseX >= trackX() && mouseX < trackX() + SCROLLBAR_W
             && mouseY >= thumbY && mouseY < thumbY + thumbH;
-        ThemeSkin.draw(g, UiElement.SCROLLBAR_TRACK,
+        ColoredTextureRenderer.drawWithAlpha(g,
+            UiTextureManager.rl(UiElement.SCROLLBAR_TRACK, Appearance.resolvedTheme()),
             trackX(), top, SCROLLBAR_W, trackH, 0x40 / 255f);
         int alpha = pane.dragging() ? 0xCC : (hovering ? 0xAA : 0x88);
-        ThemeSkin.draw(g, UiElement.SCROLLBAR_THUMB,
+        ColoredTextureRenderer.drawWithAlpha(g,
+            UiTextureManager.rl(UiElement.SCROLLBAR_THUMB, Appearance.resolvedTheme()),
             trackX(), thumbY, SCROLLBAR_W, thumbH, alpha / 255f);
     }
 
