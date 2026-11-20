@@ -60,35 +60,35 @@ public final class ThemeRegistry {
     /** 樱花粉：浅色底 + 粉调面板，文字用深玫瑰灰保证对比度。 */
     private static ChatBubbleTheme.Colors sakuraColors() {
         return new ChatBubbleTheme.Colors(
-            0xFFFDF5F7, // panelBg
-            0xFFFFF9FB, // titleBg
-            0xFFFAEEF2, // barBg
-            0xFFFCF3F6, // sidebarBg
-            0xFFF7E6EC, // sidebarItemHover
-            0xFFF2D4DF, // sidebarItemSelected
-            0xFFF0DEE5, // sidebarDivider
-            0xFFF0DEE5, // divider
-            0xFFFFFCFD, // inputBg
+            0xFFF8E7EE, // panelBg
+            0xFFFCEFF4, // titleBg
+            0xFFF5DDE7, // barBg
+            0xFFF7E5EC, // sidebarBg
+            0xFFF2D6E0, // sidebarItemHover
+            0xFFECC0D0, // sidebarItemSelected
+            0xFFEDD3DD, // sidebarDivider
+            0xFFEDD3DD, // divider
+            0xFFFDF5F8, // inputBg
             0xFF3A2830, // textPrimary
             0xFF6B4E5A, // textSecondary
             0xFF9C7C88, // textMuted
             0xFFC2407A, // nameColor
             0xFFA9848F, // timeColor
-            0xFFFFF8FA, // popupBg
-            0xFFF8E7ED, // popupHover
+            0xFFFDF3F6, // popupBg
+            0xFFF6E1E9, // popupHover
             0xFF3A2830, // popupText
-            0xFFFFF8FA, // contextBg
-            0xFFF6E3EA, // contextHover
+            0xFFFDF3F6, // contextBg
+            0xFFF3DBE4, // contextHover
             0xFF3A2830, // contextText
-            0xFFF4DEE6, // iconHover
+            0xFFF1D8E2, // iconHover
             0xFFB85C86, // notificationText
-            0xFFF2DBE3, // whisperBar
+            0xFFEFD3DE, // whisperBar
             0xFF4A2A36, // toastBg
             0xFFFBEDF1, // toastText
-            0xFFE7C8D4, // scrollbar
-            0xFFD9B0C0, // scrollbarHover
-            0xFFF2DCE4, // closeBg
-            0xFFE6C3D0, // closeHoverBg
+            0xFFE2C0CD, // scrollbar
+            0xFFD3A4B7, // scrollbarHover
+            0xFFF0D6E0, // closeBg
+            0xFFE4BFCD, // closeHoverBg
             0xFF3A2830, // closeText
             0xFF8A6A76, // systemText
             0xFFC2407A, // quoteBar
@@ -98,7 +98,7 @@ public final class ThemeRegistry {
             0xFFB85C86, // configTitle
             0xFFAA5A80, // configSection
             0xFF3A2830, // configLabel
-            0xFFFDF5F7, // configBg
+            0xFFF8E7EE, // configBg
             0xFFF7E4EB, // bannerBg
             0xFF3A2830, // bannerText
             0xFFC2407A  // bannerBar

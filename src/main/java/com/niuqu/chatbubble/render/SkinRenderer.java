@@ -29,6 +29,20 @@ public final class SkinRenderer {
         g.fill(x, y, x + w, y + h, ChatBubbleTheme.alphaBlend(base, Math.max(0, Math.min(255, a))));
     }
 
+    /** 配置屏专用：不论当前主题，一律用深色 chrome 纯色绘制。 */
+    public static void drawChrome(UiCanvas g, UiElement el, int x, int y, int w, int h, float alpha) {
+        if (w <= 0 || h <= 0 || alpha <= 0.003f) return;
+        if (el == UiElement.CONFIG_BG || el == UiElement.CONTENT_BG) {
+            int a = (int) (0xFF * alpha);
+            g.fill(x, y, x + w, y + h, ChatBubbleTheme.alphaBlend(0xFF12131A, Math.max(0, Math.min(255, a))));
+            return;
+        }
+        ChatBubbleTheme.Colors c = Appearance.configChrome();
+        int base = colorOf(el, c);
+        int a = (int) (((base >>> 24) & 0xFF) * alpha);
+        g.fill(x, y, x + w, y + h, ChatBubbleTheme.alphaBlend(base, Math.max(0, Math.min(255, a))));
+    }
+
     private static int colorOf(UiElement el, ChatBubbleTheme.Colors c) {
         return switch (el) {
             case PANEL_BG -> c.panelBg();
