@@ -5,6 +5,7 @@
 > 与 `main` 分支同源改动，详细说明见 `main` 分支 CHANGELOG。
 
 **修复**
+- **配置屏滚动条拖动不跟手**：`SmoothScrollPane.dragTo` 每次 mouseDragged 都重开一个 80ms 补间，滑块永远慢半拍；现改为拖动时直接落位并取消补间（滚轮仍保留平滑动画），三个设置界面的滚动条都 1:1 跟手
 - **指令候选列表不显示**：`ChatInputSuggestorMixin` 此前把 `CommandSuggestions.extractRenderState` 整个 cancel，而聊天面板正是手动调用它来画候选列表 —— 结果输入框里的灰色补全正常、上方的候选框（`/time set minecraft:` 的 day/midnight/night/noon）永远不出现。删掉该 cancel 后候选框恢复显示，位置仍贴在输入框正上方
 
 **其它**
