@@ -34,6 +34,11 @@ import net.minecraft.util.Mth;
 public class ChatBubbleConfigScreen extends Screen {
     private final Screen lastScreen;
 
+    /** 配置屏 chrome：固定深色主题一套。 */
+    private ChatBubbleTheme.Colors chrome() {
+        return com.niuqu.chatbubble.render.Appearance.configChrome();
+    }
+
     private ChatBubbleTheme.Colors c() {
         ChatBubbleTheme.Accent accent = themeAccent != null ? themeAccent : ChatBubbleTheme.Accent.BLUE;
         Map<String, Integer> custom = parseCustomMap(themeCustom);
@@ -365,10 +370,10 @@ public class ChatBubbleConfigScreen extends Screen {
         int trackH = bot - top;
         int th = sbThumbH(trackH, totalH);
         int ty = sbThumbY(top, trackH, th, offset, maxScroll);
-        SkinRenderer.draw(g, com.niuqu.chatbubble.texture.UiElement.SCROLLBAR_TRACK, trackX, top, SCROLLBAR_W, bot - top, 0x40 / 255f);
+        SkinRenderer.drawChrome(g, com.niuqu.chatbubble.texture.UiElement.SCROLLBAR_TRACK, trackX, top, SCROLLBAR_W, bot - top, 0x40 / 255f);
         int base = dragging ? 0xCC
             : sbHovering((int) mx, (int) my, trackX, ty, th) ? 0xAA : 0x88;
-        SkinRenderer.draw(g, com.niuqu.chatbubble.texture.UiElement.SCROLLBAR_THUMB, trackX, ty, SCROLLBAR_W, th, base / 255f);
+        SkinRenderer.drawChrome(g, com.niuqu.chatbubble.texture.UiElement.SCROLLBAR_THUMB, trackX, ty, SCROLLBAR_W, th, base / 255f);
     }
 
     private void relayoutWidgets() {
@@ -977,9 +982,9 @@ public class ChatBubbleConfigScreen extends Screen {
         UiCanvas g = UiCanvas.of(raw);
         // CONFIG_BG 烘焙为 75% 不透明（0xC0 alpha），drawTexture 无 alpha 顶点会丢 alpha 画成
         // 不透明灰块——走带 alpha 顶点的绘制恢复半透明，世界能透出来
-        SkinRenderer.draw(g, com.niuqu.chatbubble.texture.UiElement.CONFIG_BG, 0, 0, width, height, 0xC0 / 255f);
+        SkinRenderer.drawChrome(g, com.niuqu.chatbubble.texture.UiElement.CONFIG_BG, 0, 0, width, height, 0xC0 / 255f);
         tickAnims();
-        g.drawText(font, title, width / 2 - font.width(title) / 2, 14, c().configTitle(), false);
+        g.drawText(font, title, width / 2 - font.width(title) / 2, 14, chrome().configTitle(), false);
 
         String tooltipKey = null;
 
@@ -990,13 +995,13 @@ public class ChatBubbleConfigScreen extends Screen {
             boolean sel = i == selectedCat;
             boolean hover = mouseX >= CAT_X && mouseX <= CAT_X + CAT_W && mouseY >= ly && mouseY < ly + CAT_ROW_H;
             if (sel || hover)
-                SkinRenderer.draw(g, com.niuqu.chatbubble.texture.UiElement.HOVER_BG, CAT_X, ly, CAT_W, CAT_ROW_H, 1f);
+                SkinRenderer.drawChrome(g, com.niuqu.chatbubble.texture.UiElement.HOVER_BG, CAT_X, ly, CAT_W, CAT_ROW_H, 1f);
             if (sel)
-                g.fill(CAT_X, ly, CAT_X + 2, ly + CAT_ROW_H, c().configTitle());
+                g.fill(CAT_X, ly, CAT_X + 2, ly + CAT_ROW_H, chrome().configTitle());
             drawTriangle(g, CAT_X + 6, ly + (CAT_ROW_H - 5) / 2, expanded[i],
-                sel ? c().configTitle() : c().configLabel());
+                sel ? chrome().configTitle() : chrome().configLabel());
             g.drawText(font, Component.translatable(cats.get(i).key()), CAT_X + 18, ly + (CAT_ROW_H - 8) / 2,
-                sel ? c().configTitle() : c().configLabel(), false);
+                sel ? chrome().configTitle() : chrome().configLabel(), false);
             ly += CAT_ROW_H;
             if (expanded[i]) {
                 int sub = 0;
@@ -1005,11 +1010,11 @@ public class ChatBubbleConfigScreen extends Screen {
                     boolean selSub = i == selectedCat && sub == selectedSub;
                     boolean sh = mouseX >= CAT_X + 14 && mouseX <= CAT_X + CAT_W && mouseY >= ly && mouseY < ly + SUB_ROW_H;
                     if (selSub || sh)
-                        SkinRenderer.draw(g, com.niuqu.chatbubble.texture.UiElement.HOVER_BG, CAT_X + 14, ly, CAT_W - 14, SUB_ROW_H, 1f);
+                        SkinRenderer.drawChrome(g, com.niuqu.chatbubble.texture.UiElement.HOVER_BG, CAT_X + 14, ly, CAT_W - 14, SUB_ROW_H, 1f);
                     if (selSub)
-                        g.fill(CAT_X + 14, ly, CAT_X + 16, ly + SUB_ROW_H, c().configTitle());
+                        g.fill(CAT_X + 14, ly, CAT_X + 16, ly + SUB_ROW_H, chrome().configTitle());
                     g.drawText(font, Component.translatable(o.key()), CAT_X + 24, ly + (SUB_ROW_H - 8) / 2,
-                        (selSub || sh) ? c().configTitle() : c().configLabel(), false);
+                        (selSub || sh) ? chrome().configTitle() : chrome().configLabel(), false);
                     sub++;
                     ly += SUB_ROW_H;
                 }
@@ -1018,7 +1023,7 @@ public class ChatBubbleConfigScreen extends Screen {
         g.disableScissor();
         drawBar(g, tTrackX(), START_Y, viewBottom(), tTotalH(), treePane.offset(), calcTreeMaxScroll(), mouseX, mouseY, treePane.dragging());
 
-        SkinRenderer.draw(g, com.niuqu.chatbubble.texture.UiElement.DIVIDER, dividerX, START_Y - 6, 1, viewBottom() - (START_Y - 6), 1f);
+        SkinRenderer.drawChrome(g, com.niuqu.chatbubble.texture.UiElement.DIVIDER, dividerX, START_Y - 6, 1, viewBottom() - (START_Y - 6), 1f);
 
         if (showPreview()) drawBubblePreview(g);
 
@@ -1027,21 +1032,21 @@ public class ChatBubbleConfigScreen extends Screen {
         for (Opt opt : visibleOpts()) {
             if (opt.isHeader()) {
                 Component label = Component.translatable(opt.key());
-                g.drawText(font, label, optLabelX, y + 11, c().configLabel(), false);
+                g.drawText(font, label, optLabelX, y + 11, chrome().configLabel(), false);
                 int lineX = optLabelX + font.width(label) + 8;
                 int lineEnd = optLabelX + optAreaW() + 4;
                 if (lineX < lineEnd)
-            SkinRenderer.draw(g, com.niuqu.chatbubble.texture.UiElement.DIVIDER, lineX, y + 15, lineEnd - lineX, 1, 1f);
+            SkinRenderer.drawChrome(g, com.niuqu.chatbubble.texture.UiElement.DIVIDER, lineX, y + 15, lineEnd - lineX, 1, 1f);
                 y += HEADER_H;
                 continue;
             }
-            g.drawText(font, Component.translatable(opt.key()), optLabelX, y + 6, c().configLabel(), false);
+            g.drawText(font, Component.translatable(opt.key()), optLabelX, y + 6, chrome().configLabel(), false);
             if (opt.previewColor() != null) {
                 drawPreview(g, y + 3, opt.previewColor().get());
                 int px = paletteX();
                 for (int i = 0; i < PALETTE.length; i++) {
                     int bx = px + i * 10, by = y + 12;
-                    g.fill(bx, by, bx + 8, by + 8, c().iconHover());
+                    g.fill(bx, by, bx + 8, by + 8, chrome().iconHover());
                     g.fill(bx + 1, by + 1, bx + 7, by + 7, ChatBubbleConfig.parseHexColor(PALETTE[i], 0xFF000000));
                 }
             }
@@ -1062,7 +1067,7 @@ public class ChatBubbleConfigScreen extends Screen {
 
         if (changed > 0)
             g.drawText(font, Component.translatable("e33chat.config.changed", changed),
-                width / 2 + 112, height - 26, c().configLabel(), false);
+                width / 2 + 112, height - 26, chrome().configLabel(), false);
 
         if (tooltipKey != null)
             // wrap to 190px like Forge/Neo's font.split — the single-Component overload
@@ -1089,12 +1094,12 @@ public class ChatBubbleConfigScreen extends Screen {
         int mx = optLabelX + optAreaW() - mw;
         RoundRectRenderer.fill(g, mx, top + 22, mx + mw, top + 36, rad, own);
         g.drawText(font, ownMsg, mx + 4, top + 25, ownT, false);
-        SkinRenderer.draw(g, com.niuqu.chatbubble.texture.UiElement.DIVIDER, optLabelX - 4, top + PREVIEW_H - 1, optAreaW() + 8, 1, 1f);
+        SkinRenderer.drawChrome(g, com.niuqu.chatbubble.texture.UiElement.DIVIDER, optLabelX - 4, top + PREVIEW_H - 1, optAreaW() + 8, 1, 1f);
     }
 
     private void drawPreview(UiCanvas g, int y, String hex) {
         int color = ChatBubbleConfig.parseHexColor(hex, 0xFF000000);
-        g.fill(previewX, y, previewX + 14, y + 14, c().iconHover());
+        g.fill(previewX, y, previewX + 14, y + 14, chrome().iconHover());
         g.fill(previewX + 1, y + 1, previewX + 13, y + 13, color);
     }
 
