@@ -1,7 +1,7 @@
 package com.niuqu.chatbubble.render;
 
 import net.minecraft.util.Util;
-import net.minecraft.util.Mth;
+import net.minecraft.util.math.MathHelper;
 
 /**
  * One scroll region's animation + drag state, shared by the two config screens
@@ -29,8 +29,8 @@ public class SmoothScrollPane {
 
     public void animateTo(float target, int max, int dur) {
         animFrom = offset;
-        animTo = Mth.clamp(target, 0, max);
-        animStart = Util.getMillis();
+        animTo = MathHelper.clamp(target, 0, max);
+        animStart = Util.getMeasuringTimeMs();
         animDur = dur;
         animOn = true;
     }
@@ -42,7 +42,7 @@ public class SmoothScrollPane {
             offset = Math.round(animFrom + (animTo - animFrom) * t);
             if (t >= 1.0f) { offset = Math.round(animTo); animOn = false; }
         }
-        offset = Mth.clamp(offset, 0, max);
+        offset = MathHelper.clamp(offset, 0, max);
     }
 
     public boolean dragging() { return barDrag; }
@@ -57,8 +57,10 @@ public class SmoothScrollPane {
         if (!barDrag || maxScroll <= 0) return;
         int travel = trackH - ChatScrollbar.thumbHeight(trackH, totalH);
         if (travel > 0) {
+            // 拖动必须 1:1 跟手：直接落位并取消补间（动画只用于滚轮/程序滚动）
             int d = mouseY - barDragY;
-            animateTo(barDragOff + (float) d * maxScroll / travel, maxScroll, dur);
+            animOn = false;
+            offset = MathHelper.clamp(barDragOff + (int) ((long) d * maxScroll / travel), 0, maxScroll);
         }
     }
 

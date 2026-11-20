@@ -60,46 +60,46 @@ public final class ThemeRegistry {
     /** 樱花粉：浅色底 + 粉调面板，文字用深玫瑰灰保证对比度。 */
     private static ChatBubbleTheme.Colors sakuraColors() {
         return new ChatBubbleTheme.Colors(
-            0xFFF7E9EC, // panelBg
-            0xFFFBEFF2, // titleBg
-            0xFFF2DDE3, // barBg
-            0xFFF3E1E6, // sidebarBg
-            0xFFEFD2DC, // sidebarItemHover
-            0xFFE8BFCE, // sidebarItemSelected
-            0xFFE3CBD3, // sidebarDivider
-            0xFFE6CFD6, // divider
-            0xFFFBF2F4, // inputBg
+            0xFFFDF5F7, // panelBg
+            0xFFFFF9FB, // titleBg
+            0xFFFAEEF2, // barBg
+            0xFFFCF3F6, // sidebarBg
+            0xFFF7E6EC, // sidebarItemHover
+            0xFFF2D4DF, // sidebarItemSelected
+            0xFFF0DEE5, // sidebarDivider
+            0xFFF0DEE5, // divider
+            0xFFFFFCFD, // inputBg
             0xFF3A2830, // textPrimary
             0xFF6B4E5A, // textSecondary
             0xFF9C7C88, // textMuted
             0xFFC2407A, // nameColor
             0xFFA9848F, // timeColor
-            0xFFFBF0F3, // popupBg
-            0xFFF3D9E1, // popupHover
+            0xFFFFF8FA, // popupBg
+            0xFFF8E7ED, // popupHover
             0xFF3A2830, // popupText
-            0xFFFBF0F3, // contextBg
-            0xFFF0D3DC, // contextHover
+            0xFFFFF8FA, // contextBg
+            0xFFF6E3EA, // contextHover
             0xFF3A2830, // contextText
-            0xFFEAC3D0, // iconHover
-            0xFFC2407A, // notificationText
-            0xFFE9C2CE, // whisperBar
+            0xFFF4DEE6, // iconHover
+            0xFFB85C86, // notificationText
+            0xFFF2DBE3, // whisperBar
             0xFF4A2A36, // toastBg
             0xFFFBEDF1, // toastText
-            0xFFD9AEBE, // scrollbar
-            0xFFC98CA1, // scrollbarHover
-            0xFFE8CBD4, // closeBg
-            0xFFD9A2B4, // closeHoverBg
+            0xFFE7C8D4, // scrollbar
+            0xFFD9B0C0, // scrollbarHover
+            0xFFF2DCE4, // closeBg
+            0xFFE6C3D0, // closeHoverBg
             0xFF3A2830, // closeText
             0xFF8A6A76, // systemText
             0xFFC2407A, // quoteBar
             0xFFC2407A, // duplicateLabel
             0xFFE23D6D, // redDot
             0xFFFF2D6E, // redDotMention
-            0xFFC2407A, // configTitle
-            0xFFB33A6B, // configSection
+            0xFFB85C86, // configTitle
+            0xFFAA5A80, // configSection
             0xFF3A2830, // configLabel
-            0xFFF7E9EC, // configBg
-            0xFFF3D9E1, // bannerBg
+            0xFFFDF5F7, // configBg
+            0xFFF7E4EB, // bannerBg
             0xFF3A2830, // bannerText
             0xFFC2407A  // bannerBar
         );
