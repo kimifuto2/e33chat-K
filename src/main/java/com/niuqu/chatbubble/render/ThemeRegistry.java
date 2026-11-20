@@ -24,9 +24,9 @@ public final class ThemeRegistry {
                 ChatBubbleTheme.DARK.colors(), ThemeAssets.of("dark")));
         register(new ThemePalette("light", ThemeMode.LIGHT, "e33chat.theme.light", 1,
                 ChatBubbleTheme.LIGHT.colors(), ThemeAssets.of("light")));
-        register(new ThemePalette("sakura", ThemeMode.LIGHT, "e33chat.theme.sakura", 2,
+        register(new ThemePalette("sakura", ThemeMode.DARK, "e33chat.theme.sakura", 2,
                 sakuraColors(), null,
-                new ThemePalette.BubbleColors(0xFFC2407A, 0xFFFFF5F8, 0xFFF6E1E7, 0xFF3A2830)));
+                new ThemePalette.BubbleColors(0xFF8E2F80, 0xFFFFFFFF, 0xFFE7BFDF, 0xFF3A1234)));
     }
 
     private ThemeRegistry() {}
@@ -60,48 +60,48 @@ public final class ThemeRegistry {
     /** 樱花粉：浅色底 + 粉调面板，文字用深玫瑰灰保证对比度。 */
     private static ChatBubbleTheme.Colors sakuraColors() {
         return new ChatBubbleTheme.Colors(
-            0xFFF8E7EE, // panelBg
-            0xFFFCEFF4, // titleBg
-            0xFFF5DDE7, // barBg
-            0xFFF7E5EC, // sidebarBg
-            0xFFF2D6E0, // sidebarItemHover
-            0xFFECC0D0, // sidebarItemSelected
-            0xFFEDD3DD, // sidebarDivider
-            0xFFEDD3DD, // divider
-            0xFFFDF5F8, // inputBg
-            0xFF3A2830, // textPrimary
-            0xFF6B4E5A, // textSecondary
-            0xFF9C7C88, // textMuted
-            0xFFC2407A, // nameColor
-            0xFFA9848F, // timeColor
-            0xFFFDF3F6, // popupBg
-            0xFFF6E1E9, // popupHover
-            0xFF3A2830, // popupText
-            0xFFFDF3F6, // contextBg
-            0xFFF3DBE4, // contextHover
-            0xFF3A2830, // contextText
-            0xFFF1D8E2, // iconHover
-            0xFFB85C86, // notificationText
-            0xFFEFD3DE, // whisperBar
-            0xFF4A2A36, // toastBg
-            0xFFFBEDF1, // toastText
-            0xFFE2C0CD, // scrollbar
-            0xFFD3A4B7, // scrollbarHover
-            0xFFF0D6E0, // closeBg
-            0xFFE4BFCD, // closeHoverBg
-            0xFF3A2830, // closeText
-            0xFF8A6A76, // systemText
-            0xFFC2407A, // quoteBar
-            0xFFC2407A, // duplicateLabel
-            0xFFE23D6D, // redDot
+            0xFFC757B6, // panelBg
+            0xFFCE63BE, // titleBg
+            0xFFB94AA8, // barBg
+            0xFFC251B2, // sidebarBg
+            0xFFD06BC1, // sidebarItemHover
+            0xFFDC86D0, // sidebarItemSelected
+            0xFFA94099, // sidebarDivider
+            0xFFA94099, // divider
+            0xFFD877CB, // inputBg
+            0xFFFFFFFF, // textPrimary
+            0xFFFBE9F7, // textSecondary
+            0xFFF0C8E8, // textMuted
+            0xFFFFE9A8, // nameColor
+            0xFFEFC4E6, // timeColor
+            0xFFC757B6, // popupBg
+            0xFFD46FC4, // popupHover
+            0xFFFFFFFF, // popupText
+            0xFFC757B6, // contextBg
+            0xFFD46FC4, // contextHover
+            0xFFFFFFFF, // contextText
+            0xFFD46FC4, // iconHover
+            0xFFFFE9A8, // notificationText
+            0xFFB94AA8, // whisperBar
+            0xFF5A2A50, // toastBg
+            0xFFFFF0FB, // toastText
+            0xFFB94AA8, // scrollbar
+            0xFFE28FD6, // scrollbarHover
+            0xFFB94AA8, // closeBg
+            0xFFE28FD6, // closeHoverBg
+            0xFFFFFFFF, // closeText
+            0xFFFBE3F4, // systemText
+            0xFFFFE9A8, // quoteBar
+            0xFFFFE9A8, // duplicateLabel
+            0xFFFF3D6E, // redDot
             0xFFFF2D6E, // redDotMention
-            0xFFB85C86, // configTitle
-            0xFFAA5A80, // configSection
-            0xFF3A2830, // configLabel
-            0xFFF8E7EE, // configBg
-            0xFFF7E4EB, // bannerBg
-            0xFF3A2830, // bannerText
-            0xFFC2407A  // bannerBar
+            0xFFFFFFFF, // configTitle
+            0xFFFFE9A8, // configSection
+            0xFFFBE9F7, // configLabel
+            0xFFC757B6, // configBg
+            0xFFB94AA8, // bannerBg
+            0xFFFFFFFF, // bannerText
+            0xFFFFE9A8  // bannerBar
         );
     }
 }
