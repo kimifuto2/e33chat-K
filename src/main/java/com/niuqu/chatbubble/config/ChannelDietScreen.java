@@ -101,6 +101,11 @@ public class ChannelDietScreen extends Screen {
     private ChatBubbleTheme.Colors cachedColors;
     private ChatBubbleConfig cachedColorsFor;
 
+    /** 配置屏 chrome：固定深色主题一套（深色幕布上保证对比度）。 */
+    private ChatBubbleTheme.Colors chrome() {
+        return com.niuqu.chatbubble.render.Appearance.configChrome();
+    }
+
     private ChatBubbleTheme.Colors c() {
         ChatBubbleConfig cfg = ChatBubbleClientSetup.config();
         if (cachedColors == null || cachedColorsFor != cfg) {
@@ -235,29 +240,29 @@ public class ChannelDietScreen extends Screen {
     @Override
     public void render(DrawContext g, int mouseX, int mouseY, float partialTick) {
         // CONFIG_BG 烘焙为 75% 不透明，走带 alpha 顶点的绘制恢复半透明（同配置屏）
-        SkinRenderer.draw(g, UiElement.CONFIG_BG,
+        SkinRenderer.drawChrome(g, UiElement.CONFIG_BG,
             0, 0, width, height, 0xC0 / 255f);
         pane.tick(maxScroll());
 
-        g.drawText(textRenderer, title, width / 2 - textRenderer.getWidth(title) / 2, 14, c().configTitle(), false);
+        g.drawText(textRenderer, title, width / 2 - textRenderer.getWidth(title) / 2, 14, chrome().configTitle(), false);
 
         // 顶部：当前声明通道 N / 上限 —— 超限红、达标绿
         int declared = declaredTotal();
         Text headline = Text.translatable("e33chat.channeldiet.current", declared, limit);
         g.drawText(textRenderer, headline, MARGIN, HEAD_Y, declared > limit ? COLOR_OVER : COLOR_OK, false);
         g.drawText(textRenderer, Text.translatable("e33chat.channeldiet.hint"),
-            MARGIN, HEAD_Y + 16, c().textMuted(), false);
-        g.drawText(textRenderer, statsLine(), MARGIN, HEAD_Y + 30, c().textSecondary(), false);
+            MARGIN, HEAD_Y + 16, chrome().textMuted(), false);
+        g.drawText(textRenderer, statsLine(), MARGIN, HEAD_Y + 30, chrome().textSecondary(), false);
         // 底部一行提示：总开关在上一级页面（本界面没有模式按钮了），改动下次连接生效。
         // 窄窗口下按可用宽度截断，避免压到左侧「全部启用」与中间「完成」。
         String footer = Text.translatable("e33chat.channeldiet.footer").getString();
         g.drawText(textRenderer, Text.literal(truncate(footer, width - 2 * MARGIN)),
-            MARGIN, listBottom() + 6, c().textMuted(), false);
+            MARGIN, listBottom() + 6, chrome().textMuted(), false);
         // 右下角：上限标签紧贴 − / + 两个按钮（按钮在 init 里创建）；窄窗口下省略避免压到「完成」
         if (width >= 420) {
             Text limitLabel = Text.translatable("e33chat.channeldiet.limit", limit);
             g.drawText(textRenderer, limitLabel,
-                width - MARGIN - 48 - textRenderer.getWidth(limitLabel), height - 34, c().textSecondary(), false);
+                width - MARGIN - 48 - textRenderer.getWidth(limitLabel), height - 34, chrome().textSecondary(), false);
         }
 
         drawDivider(g, MARGIN, width - MARGIN, LIST_TOP - 6);
@@ -274,7 +279,7 @@ public class ChannelDietScreen extends Screen {
         }
         if (rows.isEmpty()) {
             g.drawText(textRenderer, Text.translatable("e33chat.channeldiet.empty"),
-                MARGIN + 4, LIST_TOP + 6, c().textMuted(), false);
+                MARGIN + 4, LIST_TOP + 6, chrome().textMuted(), false);
         }
         g.disableScissor();
 
@@ -290,13 +295,13 @@ public class ChannelDietScreen extends Screen {
         boolean disabledRow = !required && isDisabled(row.namespace());
         boolean hover = mouseX >= x1 && mouseX < x2 && mouseY >= y && mouseY < y + ROW_H;
 
-        RoundRectRenderer.fill(g, x1, y, x2, y + ROW_H, 4, hover ? c().sidebarItemHover() : c().inputBg());
+        RoundRectRenderer.fill(g, x1, y, x2, y + ROW_H, 4, hover ? chrome().sidebarItemHover() : chrome().inputBg());
         if (required) {
             // 必需项左侧强调条（强调色，强制不透明）
-            RoundRectRenderer.fill(g, x1, y, x1 + 2, y + ROW_H, 2, opaque(c().configSection()));
+            RoundRectRenderer.fill(g, x1, y, x1 + 2, y + ROW_H, 2, opaque(chrome().configSection()));
         }
 
-        int textColor = required ? c().configTitle() : (disabledRow ? c().textMuted() : c().textPrimary());
+        int textColor = required ? chrome().configTitle() : (disabledRow ? chrome().textMuted() : chrome().textPrimary());
         int switchX = x2 - 8 - SWITCH_W;
         int labelX = x1 + 10;
         int labelRight = switchX - 64;
@@ -310,11 +315,11 @@ public class ChannelDietScreen extends Screen {
         if (required) {
             Text need = Text.translatable("e33chat.channeldiet.required");
             int needW = textRenderer.getWidth(need);
-            g.drawText(textRenderer, need, countRight - needW, y + (ROW_H - 8) / 2, c().textMuted(), false);
+            g.drawText(textRenderer, need, countRight - needW, y + (ROW_H - 8) / 2, chrome().textMuted(), false);
             countRight -= needW + 8;
         }
         g.drawText(textRenderer, Text.literal(count), countRight - countW, y + (ROW_H - 8) / 2,
-            disabledRow ? c().textMuted() : c().textSecondary(), false);
+            disabledRow ? chrome().textMuted() : chrome().textSecondary(), false);
 
         drawSwitch(g, switchX, y + (ROW_H - SWITCH_H) / 2, !disabledRow, required);
     }
@@ -325,7 +330,7 @@ public class ChannelDietScreen extends Screen {
      */
     private void drawSwitch(DrawContext g, int x, int y, boolean on, boolean locked) {
         int radius = SWITCH_H / 2;
-        int track = locked ? COLOR_LOCKED : (on ? opaque(c().configSection()) : opaque(c().scrollbar()));
+        int track = locked ? COLOR_LOCKED : (on ? opaque(chrome().configSection()) : opaque(chrome().scrollbar()));
         RoundRectRenderer.fill(g, x, y, x + SWITCH_W, y + SWITCH_H, radius, track);
         int knobSize = SWITCH_H - 4;
         // 滑块位置只跟开关状态走：必需项是「开但锁定」，滑块仍然靠右，只是轨道变灰
@@ -343,16 +348,16 @@ public class ChannelDietScreen extends Screen {
         int thumbY = top + (int) ((long) (trackH - thumbH) * pane.offset() / max);
         boolean hovering = mouseX >= trackX() && mouseX < trackX() + SCROLLBAR_W
             && mouseY >= thumbY && mouseY < thumbY + thumbH;
-        SkinRenderer.draw(g, UiElement.SCROLLBAR_TRACK,
+        SkinRenderer.drawChrome(g, UiElement.SCROLLBAR_TRACK,
             trackX(), top, SCROLLBAR_W, trackH, 0x40 / 255f);
         int alpha = pane.dragging() ? 0xCC : (hovering ? 0xAA : 0x88);
-        SkinRenderer.draw(g, UiElement.SCROLLBAR_THUMB,
+        SkinRenderer.drawChrome(g, UiElement.SCROLLBAR_THUMB,
             trackX(), thumbY, SCROLLBAR_W, thumbH, alpha / 255f);
     }
 
     private void drawDivider(DrawContext g, int x1, int x2, int y) {
         if (x2 <= x1) return;
-        SkinRenderer.draw(g, com.niuqu.chatbubble.texture.UiElement.DIVIDER, x1, y, x2 - x1, 1, 1f);
+        SkinRenderer.drawChrome(g, com.niuqu.chatbubble.texture.UiElement.DIVIDER, x1, y, x2 - x1, 1, 1f);
     }
 
     /** 主题色里强调色系字段的 alpha 可能是 0（Accent.rgb 不带 alpha），fill 前强制不透明。 */

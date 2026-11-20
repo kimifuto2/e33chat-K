@@ -51,6 +51,11 @@ public final class Appearance {
         return v != null ? v : fallback;
     }
 
+    /** 配置屏/子界面的“深色 chrome”配色：固定用深色主题一套，保证在深色幕布上的对比度。 */
+    public static ChatBubbleTheme.Colors configChrome() {
+        return ChatBubbleTheme.DARK.colors();
+    }
+
     /** 自定义配色：字段名→ARGB，非法值丢弃。 */
     private static Map<String, Integer> parseCustom(Map<String, String> custom) {
         if (custom == null || custom.isEmpty()) return Map.of();
