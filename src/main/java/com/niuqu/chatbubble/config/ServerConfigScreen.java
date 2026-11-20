@@ -1,6 +1,5 @@
 package com.niuqu.chatbubble.config;
 import com.niuqu.chatbubble.store.ChatMessageStore;
-import com.niuqu.chatbubble.render.SkinRenderer;
 
 import com.niuqu.chatbubble.chat.TemplateMatcher;
 import com.niuqu.chatbubble.network.ServerConfigSavePayload;
@@ -132,11 +131,6 @@ public class ServerConfigScreen extends Screen {
         autoCleanV = mediaAutoClean;
         chatV.addAll(chat);
         whisperV.addAll(whisper);
-    }
-
-    /** 配置屏 chrome：固定深色主题一套（深色幕布上保证对比度）。 */
-    private ChatBubbleTheme.Colors chrome() {
-        return com.niuqu.chatbubble.render.Appearance.configChrome();
     }
 
     private ChatBubbleTheme.Colors c() { return Appearance.snapshot(); }
@@ -531,11 +525,13 @@ public class ServerConfigScreen extends Screen {
         int trackH = bot - top;
         int th = sbThumbH(trackH, totalH);
         int ty = sbThumbY(top, trackH, th, offset, maxScroll);
-        SkinRenderer.drawChrome(g, UiElement.SCROLLBAR_TRACK,
+        ColoredTextureRenderer.drawWithAlpha(g,
+            UiTextureManager.rl(UiElement.SCROLLBAR_TRACK, Appearance.resolvedTheme()),
             trackX, top, SCROLLBAR_W, bot - top, 0x40 / 255f);
         int base = dragging ? 0xCC
             : sbHovering((int) mx, (int) my, trackX, ty, th) ? 0xAA : 0x88;
-        SkinRenderer.drawChrome(g, UiElement.SCROLLBAR_THUMB,
+        ColoredTextureRenderer.drawWithAlpha(g,
+            UiTextureManager.rl(UiElement.SCROLLBAR_THUMB, Appearance.resolvedTheme()),
             trackX, ty, SCROLLBAR_W, th, base / 255f);
     }
 
@@ -630,9 +626,10 @@ public class ServerConfigScreen extends Screen {
 
     @Override
     public void render(DrawContext g, int mouseX, int mouseY, float partialTick) {
-        SkinRenderer.drawChrome(g, UiElement.CONFIG_BG, 0, 0, width, height, 1f);
+        g.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, UiTextureManager.rl(UiElement.CONFIG_BG, Appearance.resolvedTheme()),
+            0, 0, 0f, 0f, width, height, 16, 16, 16, 16);
         tickAnims();
-        g.drawText(textRenderer, title, width / 2 - textRenderer.getWidth(title) / 2, 14, chrome().configTitle(), false);
+        g.drawText(textRenderer, title, width / 2 - textRenderer.getWidth(title) / 2, 14, c().configTitle(), false);
 
         String tooltipKey = null;
 
@@ -643,11 +640,12 @@ public class ServerConfigScreen extends Screen {
             boolean sel = i == selectedCat;
             boolean hover = mouseX >= CAT_X && mouseX <= CAT_X + CAT_W && mouseY >= ly && mouseY < ly + CAT_ROW_H;
             if (sel || hover)
-                SkinRenderer.drawChrome(g, UiElement.HOVER_BG, CAT_X, ly, CAT_W, CAT_ROW_H, 1f);
+                g.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, UiTextureManager.rl(UiElement.HOVER_BG, Appearance.resolvedTheme()),
+                    CAT_X, ly, 0f, 0f, CAT_W, CAT_ROW_H, 16, 16, 16, 16);
             if (sel)
-                g.fill(CAT_X, ly, CAT_X + 2, ly + CAT_ROW_H, chrome().configTitle());
+                g.fill(CAT_X, ly, CAT_X + 2, ly + CAT_ROW_H, c().configTitle());
             g.drawText(textRenderer, Text.translatable(CAT_KEYS[i]), CAT_X + 18, ly + (CAT_ROW_H - 8) / 2,
-                sel ? chrome().configTitle() : chrome().configLabel(), false);
+                sel ? c().configTitle() : c().configLabel(), false);
             ly += CAT_ROW_H;
         }
         g.disableScissor();
@@ -655,7 +653,8 @@ public class ServerConfigScreen extends Screen {
             mouseX, mouseY, treePane.dragging());
 
         // 分类与选项区分隔线
-        SkinRenderer.drawChrome(g, com.niuqu.chatbubble.texture.UiElement.DIVIDER, dividerX(), START_Y - 6, 1, viewBottom() - (START_Y - 6), 1f);
+        g.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, UiTextureManager.rl(UiElement.DIVIDER, Appearance.resolvedTheme()),
+            dividerX(), START_Y - 6, 0f, 0f, 1, viewBottom() - (START_Y - 6), 16, 16, 16, 16);
 
         // 右区选项行，硬裁剪到视口；普通行 label 垂直居中对齐按钮（y+6），教程小行顶部对齐（y+2）
         g.enableScissor(optLabelX() - 4, viewTop(), width, viewBottom());
@@ -664,24 +663,25 @@ public class ServerConfigScreen extends Screen {
             if (row.title()) {
                 // 分区标题：灰字左对齐 + 字右侧延伸一条细分隔线（同客户端配置界面）
                 Text label = row.label();
-                g.drawText(textRenderer, label, optLabelX(), y + 11, chrome().configLabel(), false);
+                g.drawText(textRenderer, label, optLabelX(), y + 11, c().configLabel(), false);
                 int lineX = optLabelX() + textRenderer.getWidth(label) + 8;
                 int lineEnd = optLabelX() + optAreaW() + 4;
                 if (lineX < lineEnd)
-                    SkinRenderer.drawChrome(g, com.niuqu.chatbubble.texture.UiElement.DIVIDER, lineX, y + 15, lineEnd - lineX, 1, 1f);
+                    g.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, UiTextureManager.rl(UiElement.DIVIDER, Appearance.resolvedTheme()),
+                        lineX, y + 15, 0f, 0f, lineEnd - lineX, 1, 16, 16, 16, 16);
                 y += row.height();
                 continue;
             }
             if (!row.label().getString().isEmpty()) {
                 int labelY = row.height() == ROW_H ? y + 6 : y + 2;
-                g.drawText(textRenderer, row.label(), optLabelX(), labelY, chrome().configLabel(), false);
+                g.drawText(textRenderer, row.label(), optLabelX(), labelY, c().configLabel(), false);
                 if (row.tooltipKey() != null && y >= viewTop() && y + 20 <= viewBottom()
                     && mouseX >= optLabelX() - 4 && mouseX <= inputX() - 10 && mouseY >= y && mouseY <= y + 20)
                     tooltipKey = row.tooltipKey();
             }
             if (row.extraText() != null && !row.extraText().isEmpty()) {
                 g.drawText(textRenderer, Text.literal(truncate(row.extraText(), rightAreaW())),
-                    optLabelX(), y + 21, chrome().textSecondary(), false);
+                    optLabelX(), y + 21, c().textSecondary(), false);
             }
             // 实时校验错误：行内控件下方红字（模板行），像素截断防溢出
             for (Element w : row.widgets()) {
@@ -711,7 +711,7 @@ public class ServerConfigScreen extends Screen {
 
         if (changed > 0)
             g.drawText(textRenderer, Text.translatable("e33chat.config.changed", changed),
-                width / 2 + 112, height - 26, chrome().configLabel(), false);
+                width / 2 + 112, height - 26, c().configLabel(), false);
 
         if (error != null) {
             // 保存校验失败：底部固定红字（模板行/生成行的实时错误已在行下方各自显示），像素截断

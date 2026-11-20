@@ -1,6 +1,5 @@
 package com.niuqu.chatbubble.ui;
 import com.niuqu.chatbubble.texture.UiTextureManager;
-import com.niuqu.chatbubble.render.SkinRenderer;
 import com.niuqu.chatbubble.texture.ColoredTextureRenderer;
 import com.niuqu.chatbubble.render.ChatBubbleTheme;
 import com.niuqu.chatbubble.ChatBubbleScreen;
@@ -164,7 +163,8 @@ public class ChatEmojiPanel {
                         ey + (EMOTE_SLOT - font.fontHeight) / 2,
                         com.niuqu.chatbubble.render.ChatBubbleTheme.alphaBlend(c.textMuted(), a255), false);
                 if (hover) {
-                    SkinRenderer.draw(g, com.niuqu.chatbubble.texture.UiElement.CLOSE_BG,
+                    com.niuqu.chatbubble.texture.ColoredTextureRenderer.drawWithAlpha(g,
+                        com.niuqu.chatbubble.texture.UiTextureManager.rl(com.niuqu.chatbubble.texture.UiElement.CLOSE_BG),
                         ex + EMOTE_SLOT - 10, ey, 10, 10, alpha);
                     g.drawText(font, "✕", ex + EMOTE_SLOT - 8, ey + 1, c.closeText(), false);
                 }
