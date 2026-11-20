@@ -13,16 +13,18 @@ public final class Appearance {
 
     /** 解析出的基础明暗主题（DARK/LIGHT），纹理目录据此选择。 */
     public static ChatBubbleTheme resolvedTheme() {
-        return ThemePreset.current().mode() == ChatBubbleTheme.ColorMode.LIGHT
+        ChatBubbleConfig cfg = ChatBubbleClientSetup.config();
+        return ChatBubbleTheme.ColorMode.parse(cfg.theme()) == ChatBubbleTheme.ColorMode.LIGHT
             ? ChatBubbleTheme.LIGHT : ChatBubbleTheme.DARK;
     }
 
     /** 当前主题的颜色快照（含强调色与自定义覆盖）。 */
     public static ChatBubbleTheme.Colors snapshot() {
         ChatBubbleConfig cfg = ChatBubbleClientSetup.config();
+        ChatBubbleTheme.ColorMode mode = ChatBubbleTheme.ColorMode.parse(cfg.theme());
         ChatBubbleTheme.Accent accent = ChatBubbleTheme.Accent.parse(cfg.themeAccent());
         Map<String, Integer> custom = parseCustom(cfg.themeCustom());
-        return ChatBubbleTheme.resolve(ThemePreset.parse(cfg.theme()), accent, custom);
+        return ChatBubbleTheme.resolve(mode, accent, custom);
     }
 
     /** 自定义配色：字段名→ARGB，非法值丢弃。 */
