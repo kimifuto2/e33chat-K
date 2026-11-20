@@ -5,7 +5,6 @@ import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.systems.RenderSystem;
 
 import com.niuqu.chatbubble.config.ChatBubbleConfig;
-import com.niuqu.chatbubble.render.ThemeSkin;
 import com.niuqu.chatbubble.chat.action.ActionMessages;
 import com.niuqu.chatbubble.chat.action.PlayerActionScope;
 import com.niuqu.chatbubble.chat.action.PlayerActionVerbs;
@@ -555,7 +554,7 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
 
     /** 输入框宽度的唯一算法（窄窗口下不能算出 0/负值，见 {@link #MIN_INPUT_W}）。 */
     private int inputFieldWidth(int inputX, int sendX) {
-        return Math.max(MIN_INPUT_W, sendX - ICON_S - 8 - inputX - INPUT_CURSOR_RESERVE - (ICON_S + 2));
+        return Math.max(MIN_INPUT_W, sendX - ICON_S - 8 - inputX - INPUT_CURSOR_RESERVE);
     }
 
     /** 底栏输入框**本体**的左边界（不含已选动作前缀）；绘制与布局都从这里取值。 */
@@ -735,8 +734,8 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
     private static final int SIDEBAR_LIST_TOP = 2 + SIDEBAR_SEARCH_H + 3 + SIDEBAR_ITEM_H + 2;
 
     private void renderSidebar(UiCanvas g, int mouseX, int mouseY, float alpha) {
-        ThemeSkin.draw(g, UiElement.SIDEBAR_BG, 0, 0, SIDEBAR_W, height, alpha);
-        ThemeSkin.draw(g, UiElement.DIVIDER, SIDEBAR_W - 1, 0, 1, height, alpha);
+        ColoredTextureRenderer.drawWithAlpha(g, UiTextureManager.rl(UiElement.SIDEBAR_BG), 0, 0, SIDEBAR_W, height, alpha);
+        ColoredTextureRenderer.drawWithAlpha(g, UiTextureManager.rl(UiElement.DIVIDER), SIDEBAR_W - 1, 0, 1, height, alpha);
 
         int y = 2;
         int itemH = SIDEBAR_ITEM_H;
@@ -772,9 +771,9 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
         boolean isPublic = whisperPartner == null;
         boolean hoverTab = mouseX >= 0 && mouseX <= SIDEBAR_W && mouseY >= y && mouseY <= y + itemH;
         if (isPublic)
-            ThemeSkin.draw(g, UiElement.SIDEBAR_SELECTED, 0, y, SIDEBAR_W, itemH, alpha);
+            ColoredTextureRenderer.drawWithAlpha(g, UiTextureManager.rl(UiElement.SIDEBAR_SELECTED), 0, y, SIDEBAR_W, itemH, alpha);
         else if (hoverTab)
-            ThemeSkin.draw(g, UiElement.SIDEBAR_HOVER, 0, y, SIDEBAR_W, itemH, alpha);
+            ColoredTextureRenderer.drawWithAlpha(g, UiTextureManager.rl(UiElement.SIDEBAR_HOVER), 0, y, SIDEBAR_W, itemH, alpha);
         drawTextureIconAlpha(g, iconTex("public_icon"), 2, y + 1, SIDEBAR_ICON_S, alpha);
         int nameX = 2 + SIDEBAR_ICON_S + 3;
         String publicLabel = Component.translatable("e33chat.sidebar.public").getString();
@@ -824,9 +823,9 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
                         boolean sel = name.equals(whisperPartner);
                         boolean hoverRow = mouseX >= 0 && mouseX <= SIDEBAR_W && mouseY >= scrollY && mouseY <= scrollY + rowH;
                         if (sel)
-                            ThemeSkin.draw(g, UiElement.SIDEBAR_SELECTED, 0, scrollY, SIDEBAR_W, rowH, alpha);
+                            ColoredTextureRenderer.drawWithAlpha(g, UiTextureManager.rl(UiElement.SIDEBAR_SELECTED), 0, scrollY, SIDEBAR_W, rowH, alpha);
                         else if (hoverRow)
-                            ThemeSkin.draw(g, UiElement.SIDEBAR_HOVER, 0, scrollY, SIDEBAR_W, rowH, alpha);
+                            ColoredTextureRenderer.drawWithAlpha(g, UiTextureManager.rl(UiElement.SIDEBAR_HOVER), 0, scrollY, SIDEBAR_W, rowH, alpha);
 
                         if (row.isGroup()) {
                             renderGroupRow(g, row, scrollY, rowH, alpha, name.equals(whisperPartner));
@@ -2277,12 +2276,6 @@ boolean selDrag = textSelection.isDragActive();
         }
         int sendX = panelX + panelW - PAD - ICON_S + 2;
         int emojiX = sendX - ICON_S - 4;
-        int themeX = emojiX - ICON_S - 2;
-        if (mx >= themeX && mx <= themeX + ICON_S && my >= iconY && my <= iconY + ICON_S) {
-            if (settingsMenu.visible) beginPopupClose(s -> settingsCloseStart = s, () -> settingsMenu.visible = false);
-            cycleThemePreset();
-            return true;
-        }
         if (mx >= emojiX && mx <= emojiX + ICON_S && my >= iconY && my <= iconY + ICON_S) {
             if (settingsMenu.visible) beginPopupClose(s -> settingsCloseStart = s, () -> settingsMenu.visible = false);
             if (searchPanel.visible) closeSearchPanel();
@@ -2643,7 +2636,7 @@ boolean selDrag = textSelection.isDragActive();
         if (ChatBubbleClientSetup.config().blurEnabled() && panelOpacity < 0.999f && !zoom) {
             BlurRenderer.blurPanel(g, panelOffset + fillLeft, 0, panelX + panelW - fillLeft, height);
         }
-        ThemeSkin.draw(g, UiElement.PANEL_BG,
+        ColoredTextureRenderer.drawWithAlpha(g, UiTextureManager.rl(UiElement.PANEL_BG),
             fillLeft, 0, panelX + panelW - fillLeft, height, panelOpacity);
 
         // 上下栏背景只跟开合动画（fade 终点 1.0 不透明），不乘 PANEL_OPACITY ?.3.7 起永久半透明回归
@@ -2740,13 +2733,13 @@ boolean selDrag = textSelection.isDragActive();
         // Content (icons/text) alpha follows only the open/close animation       // panelOpacity must not tint it (2.3.7 regression: permanent 80%
         // opacity made icons/text lighter on light themes).
         int c255 = (int) (255 * getAnimProgress());
-        ThemeSkin.draw(g, UiElement.TITLE_BAR, panelX, ty, panelW, TITLE_H, panelAlpha);
-        ThemeSkin.draw(g, UiElement.DIVIDER, panelX, ty + TITLE_H, panelW, 1, panelAlpha);
+        ColoredTextureRenderer.drawWithAlpha(g, UiTextureManager.rl(UiElement.TITLE_BAR), panelX, ty, panelW, TITLE_H, panelAlpha);
+        ColoredTextureRenderer.drawWithAlpha(g, UiTextureManager.rl(UiElement.DIVIDER), panelX, ty + TITLE_H, panelW, 1, panelAlpha);
 
         int menuX = panelX + 3;
         int menuY = ty + (TITLE_H - ICON_S) / 2;
         boolean hoverMenu = mouseX >= menuX && mouseX <= menuX + ICON_S && mouseY >= menuY && mouseY <= menuY + ICON_S;
-        if (hoverMenu) ThemeSkin.draw(g, UiElement.HOVER_BG, menuX - 1, menuY - 1, ICON_S + 2, ICON_S + 2, panelAlpha);
+        if (hoverMenu) ColoredTextureRenderer.drawWithAlpha(g, UiTextureManager.rl(UiElement.HOVER_BG), menuX - 1, menuY - 1, ICON_S + 2, ICON_S + 2, panelAlpha);
         drawTextureIconAlpha(g, iconTex("menu"), menuX, menuY, ICON_S, getAnimProgress());
 
         // 免打扰（DND）按钮：汉堡右侧，与齿轮按钮同尺寸的圆角按钮，启用态为紫色高亮底。
@@ -4223,7 +4216,7 @@ boolean showAvatar = !(ChatBubbleClientSetup.config().hideRepeatedAvatars() != n
     private void renderNotificationBar(UiCanvas g, int mouseX, int mouseY) {
         if (newMessageCount <= 0) return;
         int notifY = barTop - NOTIF_H;
-        ThemeSkin.draw(g, UiElement.DIVIDER, panelX, notifY - 1, panelW, 1, getAnimProgress());
+        ColoredTextureRenderer.drawWithAlpha(g, UiTextureManager.rl(UiElement.DIVIDER), panelX, notifY - 1, panelW, 1, getAnimProgress());
         int yellow = c().notificationText();
         int textY = notifY + (NOTIF_H - font.lineHeight) / 2;
         String ct = Component.translatable("e33chat.notif.new_messages", newMessageCount).getString() + " ▽";
@@ -4376,9 +4369,9 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
         int barY = barTop - REPLY_BAR_H - notifOffset;
 
         float panelBgAlpha = (c().panelBg() >>> 24) / 255f;
-        ThemeSkin.draw(g, UiElement.PANEL_BG,
+        ColoredTextureRenderer.drawWithAlpha(g, UiTextureManager.rl(UiElement.PANEL_BG),
             barX, barY, barW, barTop - notifOffset - barY, panelBgAlpha);
-        ThemeSkin.draw(g, UiElement.DIVIDER, barX, barTop - notifOffset - 1, barW, 1, getAnimProgress());
+        ColoredTextureRenderer.drawWithAlpha(g, UiTextureManager.rl(UiElement.DIVIDER), barX, barTop - notifOffset - 1, barW, 1, getAnimProgress());
 
         String sender = target.senderName().getString();
         if (sender.isEmpty()) sender = Component.translatable("e33chat.sender.system").getString();
@@ -4392,7 +4385,8 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
         int cy = barY + 3;
         boolean hoverX = mouseX >= cx && mouseX <= cx + 12 && mouseY >= cy && mouseY <= cy + 12;
         int xBg = hoverX ? c().closeHoverBg() : c().sidebarItemSelected();
-        ThemeSkin.draw(g, hoverX ? UiElement.CLOSE_HOVER : UiElement.SIDEBAR_SELECTED, cx, cy, 12, 12, getAnimProgress());
+        ColoredTextureRenderer.drawWithAlpha(g, UiTextureManager.rl(hoverX ? UiElement.CLOSE_HOVER : UiElement.SIDEBAR_SELECTED),
+            cx, cy, 12, 12, getAnimProgress());
         g.drawText(font, "✕", cx + 6 - font.width("✕") / 2, cy + 2, c().closeText(), false);
     }
 
@@ -4461,29 +4455,9 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
         // Background fades with the text, at half opacity like the strong-hint bar
         // TOAST_BG 烘焙不透明 toastBg；纹理 × 动画 alpha = 半透明淡入淡出（2.2.4 黑块根因：
         // 当时 blit 的 alpha 通道渲染不透明纯黑，改 drawWithAlpha 后纹理可覆盖 + 透明度可控
-        ThemeSkin.draw(g, UiElement.TOAST_BG,
+        ColoredTextureRenderer.drawWithAlpha(g, UiTextureManager.rl(UiElement.TOAST_BG),
             tx - 6, ty - 2, tw + 12, font.lineHeight + 4, (alpha / 2) / 255f);
         g.drawText(font, text, tx, ty, color, false);
-    }
-
-    /** 循环切换主题预设：底栏调色板按钮与设置菜单「主题」共用同一入口。 */
-    private void cycleThemePreset() {
-        com.niuqu.chatbubble.render.ThemePreset next = com.niuqu.chatbubble.render.ThemePreset.current().next();
-        ChatBubbleClientSetup.saveConfig(ChatBubbleClientSetup.config().withTheme(next.key()));
-        boolean light = next.mode() == ChatBubbleTheme.ColorMode.LIGHT;
-        int editColor = light ? c().textSecondary() : c().textPrimary();
-        input.setTextColor(editColor);
-        input.setTextColorUneditable(c().textMuted());
-        sidebarSearchBox.setTextColor(editColor);
-        sidebarSearchBox.setTextColorUneditable(editColor);
-        quickChatInput.setTextColor(editColor);
-        quickChatInput.setTextColorUneditable(c().textMuted());
-        searchInput.setTextColor(editColor);
-        searchInput.setTextColorUneditable(c().textMuted());
-        int cmdAlpha = light ? 0x99 : 0xDD;
-        commandSuggestions = new CommandSuggestions(minecraft, this, input, font,
-            false, false, 0, 8, true, ChatBubbleTheme.alphaBlend(c().panelBg(), cmdAlpha));
-        commandSuggestions.setAllowSuggestions(true);
     }
 
     private void executeMenuAction(int action) {
@@ -4509,9 +4483,24 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
                 quickChatInput.setValue("");
                 setFocused(input);
                 break;
-            case 2: // theme
-                cycleThemePreset();
+            case 2: { // theme
+                ChatBubbleTheme next = theme() == ChatBubbleTheme.DARK ? ChatBubbleTheme.LIGHT : ChatBubbleTheme.DARK;
+                ChatBubbleClientSetup.saveConfig(ChatBubbleClientSetup.config().withTheme(next.name().toLowerCase()));
+                        int editColor = next == ChatBubbleTheme.LIGHT ? c().textSecondary() : c().textPrimary();
+                input.setTextColor(editColor);
+                input.setTextColorUneditable(c().textMuted());
+                sidebarSearchBox.setTextColor(editColor);
+                sidebarSearchBox.setTextColorUneditable(editColor);
+                quickChatInput.setTextColor(editColor);
+                quickChatInput.setTextColorUneditable(c().textMuted());
+                searchInput.setTextColor(editColor);
+                searchInput.setTextColorUneditable(c().textMuted());
+                int cmdAlpha = next == ChatBubbleTheme.LIGHT ? 0x99 : 0xDD;
+                commandSuggestions = new CommandSuggestions(minecraft, this, input, font,
+                    false, false, 0, 8, true, ChatBubbleTheme.alphaBlend(c().panelBg(), cmdAlpha));
+                commandSuggestions.setAllowSuggestions(true);
                 break;
+            }
             case 3: // settings
                 minecraft.gui.setScreen(new ChatBubbleConfigScreen(this));
                 break;
@@ -4533,7 +4522,7 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
         int barBg = ChatBubbleTheme.alphaBlend(c().barBg(), a255);
         // 1.21.11 restyle: rounded floating card instead of the flat textured strip ( ? style).
         RoundRectRenderer.fill(g, panelX, barTop, panelX + panelW, height, 9f, barBg);
-        ThemeSkin.draw(g, UiElement.DIVIDER, panelX, barTop, panelW, 1, panelAlpha);
+        ColoredTextureRenderer.drawWithAlpha(g, UiTextureManager.rl(UiElement.DIVIDER), panelX, barTop, panelW, 1, panelAlpha);
 
         int iconY = barTop + (BAR_H - ICON_S) / 2;
 
@@ -4564,7 +4553,6 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
         int gearX = panelX + 4;
         int sendX = panelX + panelW - PAD - ICON_S + 2;
         int emojiX = sendX - ICON_S - 4;
-        int themeX = emojiX - ICON_S - 2;
 
         boolean hoverGear = mouseX >= gearX && mouseX <= gearX + ICON_S
             && mouseY >= iconY && mouseY <= iconY + ICON_S;
@@ -4573,10 +4561,6 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
         boolean hoverEmoji = mouseX >= emojiX && mouseX <= emojiX + ICON_S
             && mouseY >= iconY && mouseY <= iconY + ICON_S;
         drawIconButton(g, iconTex("emoji"), emojiX, iconY, ICON_S - 1, getAnimProgress(), hoverEmoji || emojiPanel.visible);
-
-        boolean hoverTheme = mouseX >= themeX && mouseX <= themeX + ICON_S
-            && mouseY >= iconY && mouseY <= iconY + ICON_S;
-        drawIconButton(g, iconTex("theme"), themeX, iconY, ICON_S - 1, getAnimProgress(), hoverTheme);
 
         boolean hoverSend = mouseX >= sendX && mouseX <= sendX + ICON_S
             && mouseY >= iconY && mouseY <= iconY + ICON_S;
