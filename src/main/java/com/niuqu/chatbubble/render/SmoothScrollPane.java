@@ -57,8 +57,10 @@ public class SmoothScrollPane {
         if (!barDrag || maxScroll <= 0) return;
         int travel = trackH - ChatScrollbar.thumbHeight(trackH, totalH);
         if (travel > 0) {
+            // 拖动必须 1:1 跟手：直接落位并取消补间（动画只用于滚轮/程序滚动）
             int d = mouseY - barDragY;
-            animateTo(barDragOff + (float) d * maxScroll / travel, maxScroll, dur);
+            animOn = false;
+            offset = MathHelper.clamp(barDragOff + (int) ((long) d * maxScroll / travel), 0, maxScroll);
         }
     }
 
