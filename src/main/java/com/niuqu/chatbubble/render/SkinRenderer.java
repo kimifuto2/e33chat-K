@@ -13,6 +13,11 @@ public final class SkinRenderer {
 
     public static void draw(UiCanvas g, UiElement el, int x, int y, int w, int h, float alpha) {
         if (w <= 0 || h <= 0 || alpha <= 0.003f) return;
+        if (el == UiElement.CONFIG_BG || el == UiElement.CONTENT_BG) {
+            int a = (int) (0xFF * alpha);
+            g.fill(x, y, x + w, y + h, ChatBubbleTheme.alphaBlend(0xFF12131A, Math.max(0, Math.min(255, a))));
+            return;
+        }
         ThemePalette palette = ThemeRegistry.current();
         if (palette.usesTextures()) {
             ColoredTextureRenderer.drawWithAlpha(g, el.rl(Appearance.resolvedTheme()), x, y, w, h, alpha);
