@@ -57,8 +57,11 @@ public class SmoothScrollPane {
         if (!barDrag || maxScroll <= 0) return;
         int travel = trackH - ChatScrollbar.thumbHeight(trackH, totalH);
         if (travel > 0) {
+            // 拖动必须 1:1 跟手：直接落位并取消补间（补间只留给滚轮/程序滚动）。
+            // 原来每次 mouseDragged 都重开一个 80ms 补间，鼠标一动就重置目标，滑块永远慢半拍。
             int d = mouseY - barDragY;
-            animateTo(barDragOff + (float) d * maxScroll / travel, maxScroll, dur);
+            animOn = false;
+            offset = MathHelper.clamp(barDragOff + (int) ((long) d * maxScroll / travel), 0, maxScroll);
         }
     }
 
