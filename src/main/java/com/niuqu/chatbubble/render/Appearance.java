@@ -11,20 +11,19 @@ import java.util.Map;
 public final class Appearance {
     private Appearance() {}
 
-    /** 解析出的基础明暗主题（DARK/LIGHT），纹理目录据此选择。 */
+    /** 当前主题的明暗模式（纹理目录/图标剪影据此选择）。 */
     public static ChatBubbleTheme resolvedTheme() {
-        ChatBubbleConfig cfg = ChatBubbleClientSetup.config();
-        return ChatBubbleTheme.ColorMode.parse(cfg.theme()) == ChatBubbleTheme.ColorMode.LIGHT
+        return ThemeRegistry.current().mode() == ThemeMode.LIGHT
             ? ChatBubbleTheme.LIGHT : ChatBubbleTheme.DARK;
     }
 
     /** 当前主题的颜色快照（含强调色与自定义覆盖）。 */
     public static ChatBubbleTheme.Colors snapshot() {
         ChatBubbleConfig cfg = ChatBubbleClientSetup.config();
-        ChatBubbleTheme.ColorMode mode = ChatBubbleTheme.ColorMode.parse(cfg.theme());
         ChatBubbleTheme.Accent accent = ChatBubbleTheme.Accent.parse(cfg.themeAccent());
         Map<String, Integer> custom = parseCustom(cfg.themeCustom());
-        return ChatBubbleTheme.resolve(mode, accent, custom);
+        // 基色来自当前 palette（阶段 1 时就是 dark/light 的 42 色），再叠加强调色与 themeCustom。
+        return ChatBubbleTheme.resolveFrom(ThemeRegistry.current().colors(), accent, custom);
     }
 
     /** 自定义配色：字段名→ARGB，非法值丢弃。 */
