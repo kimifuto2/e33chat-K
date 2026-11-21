@@ -68,7 +68,7 @@ public class ChatSearchPanel {
             && mouseY >= inputY && mouseY <= inputY + INPUT_H;
         if (hoverInput || searchInput.isFocused())
             com.niuqu.chatbubble.render.RoundRectRenderer.fill(g, inputX, inputY, inputX + inputW, inputY + INPUT_H, 5f,
-                com.niuqu.chatbubble.render.ChatBubbleTheme.alphaBlend(c.textMuted(), a255));
+                com.niuqu.chatbubble.render.ChatBubbleTheme.alphaBlend(c.popupHover(), a255 * 0x55 / 255));
 
         if (!counter.isEmpty()) {
             int cc = searchMatches.isEmpty() ? c.textMuted() : c.textSecondary();

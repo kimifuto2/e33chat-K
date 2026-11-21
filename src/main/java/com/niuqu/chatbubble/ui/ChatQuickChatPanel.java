@@ -111,7 +111,7 @@ public class ChatQuickChatPanel {
             && mouseY >= inputY && mouseY <= inputY + inputH;
         if (hoverInput || input.isFocused())
             com.niuqu.chatbubble.render.RoundRectRenderer.fill(g, inputX, inputY, inputX + inputW, inputY + inputH, 5f,
-                com.niuqu.chatbubble.render.ChatBubbleTheme.alphaBlend(c.textMuted(), a255));
+                com.niuqu.chatbubble.render.ChatBubbleTheme.alphaBlend(c.popupHover(), a255 * 0x55 / 255));
         if (input.getText().isEmpty() && !input.isFocused())
             g.drawText(font, Text.translatable("e33chat.quick_chat.placeholder").getString(),
                 inputX + 2, inputY + 3, com.niuqu.chatbubble.render.ChatBubbleTheme.alphaBlend(c.textMuted(), a255), false);
