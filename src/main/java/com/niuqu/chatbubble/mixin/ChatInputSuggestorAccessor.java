@@ -8,4 +8,10 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 public interface ChatInputSuggestorAccessor {
     @Accessor("suggestions")
     CommandSuggestions.SuggestionsList getWindow();
+
+    @Accessor("commandUsagePosition")
+    void e33chat$setUsageX(int x);
+
+    @Accessor("commandUsageWidth")
+    void e33chat$setUsageWidth(int w);
 }

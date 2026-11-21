@@ -19,12 +19,17 @@ public final class ChatTextSelection {
    public ChatTextSelection() {
    }
 
+   /** 选中背景：与输入框选中统一，取当前主题调色板的「选中」色。 */
    public static int selectionBg() {
-      return -533893162;
+      // 「选中」色在暗色主题里是近黑灰（#3A3A3A），单独用会像黑块；
+      // 用选中色与强调色各半混合：保留选中色的明度层级，同时带上主题色相。
+      ChatBubbleTheme.Colors c = Appearance.snapshot();
+      return 0xFF000000 | (ChatBubbleTheme.mix(c.sidebarItemSelected(), c.quoteBar(), 0.5) & 0xFFFFFF);
    }
 
+   /** 选中文字：取当前主题的主文字色（深色主题=白字，浅色主题=深字）。 */
    public static int selectionFg() {
-      return -1;
+      return Appearance.snapshot().textPrimary();
    }
 
    public void begin(int msg, int line, int kind, int ch) {

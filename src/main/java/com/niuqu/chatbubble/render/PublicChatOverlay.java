@@ -432,9 +432,9 @@ public final class PublicChatOverlay {
         if (a > 0) {
             int nameColor = ChatBubbleTheme.alphaBlend(c.nameColor(), a);
             int bodyColor = ChatBubbleTheme.alphaBlend(c.textPrimary(), a);
-            g.drawText(tr, v.name, x, y, nameColor, true);
+            g.drawText(tr, v.name, x, y, nameColor, false);
             for (int i = 0; i < v.lines.size(); i++) {
-                g.drawText(tr, v.lines.get(i), x + v.indent, y + i * lineH, bodyColor, true);
+                g.drawText(tr, v.lines.get(i), x + v.indent, y + i * lineH, bodyColor, false);
             }
             drawDupLabel(g, tr, c, v, x, y, lineH, a, true);
         }
