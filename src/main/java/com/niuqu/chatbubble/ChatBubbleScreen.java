@@ -1849,7 +1849,11 @@ if (this.getFocused() != null && this.getFocused().keyPressed(input))
                 }
                 if (localX >= 1 && localX <= 2 + SIDEBAR_SEARCH_W
                     && mouseY >= 2 && mouseY <= 2 + SIDEBAR_SEARCH_H) {
-                    setFocused(sidebarSearchBox); input.setFocused(false); return true;
+                    sidebarSearchBox.mouseClicked(click, doubleClick);
+                    setFocused(sidebarSearchBox);
+                    if (button == 0) setDragging(true);
+                    input.setFocused(false);
+                    return true;
                 }
             }
             if (sidebarSearchBox.isFocused()) setFocused(input);
@@ -1996,7 +2000,9 @@ if (ChatQuickChatPanel.isInsideInput((int) mouseX, (int) mouseY, panelX, panelW,
                         ChatBubbleClientSetup.config().quickChatPhrases().size())) {
                     //  ?sidebar 搜索框聚焦同款（Fabric 实测需显式失焦主输入框，否则焦点链 ?input 占用
 quickChatInput.setVisible(true);
+                    quickChatInput.mouseClicked(click, doubleClick);
                     setFocused(quickChatInput);
+                    if (button == 0) setDragging(true);
                     input.setFocused(false);
                     return true;
                 }
@@ -2011,7 +2017,10 @@ quickChatInput.setVisible(true);
             }
             if (searchPanel.visible) {
                 if (searchPanel.isClickOnPanel((int) mouseX, (int) mouseY, panelX, panelW, barTop)) {
-                    setFocused(searchInput); return true;
+                    searchInput.mouseClicked(click, doubleClick);
+                    setFocused(searchInput);
+                    if (button == 0) setDragging(true);
+                    return true;
                 }
                 closeSearchPanel(); return true;
             }
