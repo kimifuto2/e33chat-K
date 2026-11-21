@@ -437,11 +437,12 @@ public final class PublicChatOverlay {
         if (a > 0) {
             int nameColor = ChatBubbleTheme.alphaBlend(c.nameColor(), a);
             int bodyColor = ChatBubbleTheme.alphaBlend(c.textPrimary(), a);
-            g.drawText(tr, v.name, x, y, nameColor, true);
+            // 像素字体不开阴影：1px 硬阴影会被看成重影（样式 A 的文字对比用主题色保证）
+            g.drawText(tr, v.name, x, y, nameColor, false);
             for (int i = 0; i < v.lines.size(); i++) {
-                g.drawText(tr, v.lines.get(i), x + v.indent, y + i * lineH, bodyColor, true);
+                g.drawText(tr, v.lines.get(i), x + v.indent, y + i * lineH, bodyColor, false);
             }
-            drawDupLabel(g, tr, c, v, x, y, lineH, a, true);
+            drawDupLabel(g, tr, c, v, x, y, lineH, a, false);
         }
         return y + v.rows() * lineH;
     }

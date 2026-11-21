@@ -3,6 +3,8 @@ import com.niuqu.chatbubble.ChatBubbleClientSetup;
 import com.niuqu.chatbubble.store.ChatMessageStore;
 import com.niuqu.chatbubble.ChatBubbleScreen;
 import com.niuqu.chatbubble.ChatBubbleMod;
+import com.niuqu.chatbubble.texture.UiTextureManager;
+import com.niuqu.chatbubble.texture.ColoredTextureRenderer;
 import com.niuqu.chatbubble.config.ChatBubbleConfig;
 import com.niuqu.chatbubble.render.ChatBubbleTheme;
 import com.niuqu.chatbubble.render.Appearance;
@@ -33,8 +35,7 @@ public class ChatBubbleHudOverlay {
     private static ChatBubbleConfig cfg() { return ChatBubbleClientSetup.config(); }
 
     private static Identifier chatIconTex() {
-        String theme = Appearance.resolvedTheme().name().toLowerCase();
-        return Identifier.of("e33chat", "textures/gui/" + theme + "/chat_icon.png");
+        return UiTextureManager.png("chat_icon", Appearance.resolvedTheme());
     }
 
     private static ChatBubbleTheme theme() {
@@ -102,7 +103,8 @@ public class ChatBubbleHudOverlay {
             String keyDisplay = "[" + keyName + "]";
             int keyW = mc.textRenderer.getWidth(keyDisplay);
             int keyX = keyW > ICON_S ? x : x + (ICON_S - keyW) / 2;
-            g.drawText(mc.textRenderer, keyDisplay, keyX, textY, 0xFFFFFFFF, false);
+            // 与图标同色：当前主题强调色；不开阴影（像素字加阴影会看起来像重影）
+            g.drawText(mc.textRenderer, keyDisplay, keyX, textY, hintColor(), false);
         }
 
         g.getMatrices().popMatrix();
@@ -155,13 +157,19 @@ public class ChatBubbleHudOverlay {
     }
 
 
+    /** 左下角提示（图标 / [按键] / 红点）统一取当前主题的强调色。 */
+    private static int hintColor() {
+        return 0xFF000000 | (c().quoteBar() & 0xFFFFFF);
+    }
+
     private static void drawIcon(DrawContext g, int x, int y) {
-        // getTexture 无缓存时自动 new ResourceTexture 懒加载（资源包可覆盖，F3+T 即时生效）
-        g.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, chatIconTex(), x, y, 0.0F, 0.0F, ICON_S, ICON_S, ICON_S, ICON_S);
+        // 白色剪影 PNG × 主题强调色 tint（资源包仍可覆盖 PNG，F3+T 即时生效）
+        ColoredTextureRenderer.drawTinted(g, chatIconTex(), x, y, ICON_S, ICON_S, hintColor());
     }
 
     private static void drawScaledTip(DrawContext g, int x, int y, int disp) {
         Identifier tex = ChatBubbleScreen.iconTex("private_tip");
-        g.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, tex, x, y, (float) SRC_U, (float) SRC_V, disp, disp, SRC_S, SRC_S, 16, 16);
+        ColoredTextureRenderer.drawTinted(g, tex, x, y, disp, disp,
+            SRC_U, SRC_V, SRC_S, SRC_S, 16, 16, hintColor());
     }
 }

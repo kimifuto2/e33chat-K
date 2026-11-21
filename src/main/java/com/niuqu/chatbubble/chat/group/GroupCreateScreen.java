@@ -94,6 +94,7 @@ public class GroupCreateScreen extends GroupModal {
         if (!isInviteMode()) {
             // 位置在 layout() 里按卡片矩形排（这里只创建，坐标先给 0）
             nameField = new TextFieldWidget(tr, 0, 0, 120, 12, Text.empty());
+nameField.setTextShadow(false);
             nameField.setMaxLength(32);
             nameField.setDrawsBackground(false);
             nameField.setEditableColor(GroupUi.colors().textPrimary());
@@ -102,6 +103,7 @@ public class GroupCreateScreen extends GroupModal {
         }
         // 搜索框：两种模式都有（「添加玩家」页复用的就是本类）
         searchField = new TextFieldWidget(tr, 0, 0, 120, 12, Text.empty());
+searchField.setTextShadow(false);
         searchField.setMaxLength(32);
         searchField.setDrawsBackground(false);
         searchField.setEditableColor(GroupUi.colors().textPrimary());

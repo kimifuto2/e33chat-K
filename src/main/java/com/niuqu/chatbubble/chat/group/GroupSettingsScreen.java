@@ -111,6 +111,7 @@ public class GroupSettingsScreen extends GroupModal {
         super(host);
         this.groupId = groupId;
         nameField = new TextFieldWidget(tr, 0, 0, 120, 12, Text.empty());
+nameField.setTextShadow(false);
         nameField.setMaxLength(32);
         nameField.setDrawsBackground(false);
         nameField.setEditableColor(GroupUi.colors().textPrimary());
@@ -122,6 +123,7 @@ public class GroupSettingsScreen extends GroupModal {
 
         // 成员搜索框（第 4 轮）：与「添加玩家」页的搜索框同款（无背景底、纯文字，底框自己画）
         searchField = new TextFieldWidget(tr, 0, 0, 120, 12, Text.empty());
+searchField.setTextShadow(false);
         searchField.setMaxLength(32);
         searchField.setDrawsBackground(false);
         searchField.setEditableColor(GroupUi.colors().textPrimary());

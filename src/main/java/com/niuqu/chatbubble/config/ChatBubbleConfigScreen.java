@@ -33,10 +33,9 @@ public class ChatBubbleConfigScreen extends Screen {
     private final Screen lastScreen;
 
     private ChatBubbleTheme.Colors c() {
-        ChatBubbleTheme.ColorMode mode = (theme == ChatBubbleTheme.LIGHT) ? ChatBubbleTheme.ColorMode.LIGHT : ChatBubbleTheme.ColorMode.DARK;
         ChatBubbleTheme.Accent accent = themeAccent != null ? themeAccent : ChatBubbleTheme.Accent.BLUE;
         Map<String, Integer> custom = parseCustomMap(themeCustom);
-        return ChatBubbleTheme.resolve(mode, accent, custom);
+        return ChatBubbleTheme.resolve(theme != null ? theme : ChatBubbleTheme.DARK, accent, custom);
     }
 
     /** 关键色纹理主题：本地主题（实时预览），未初始化回退 DARK。 */
@@ -217,8 +216,11 @@ public class ChatBubbleConfigScreen extends Screen {
     }
 
     private void saveAll() {
+        if (themeCustom != null) {
+            themeCustom.entrySet().removeIf(e -> e.getKey() == null || e.getValue() == null || e.getValue().isEmpty());
+        }
         ChatBubbleClientSetup.saveConfig(new ChatBubbleConfig(
-            enabled, theme.name().toLowerCase(),
+            enabled, theme.key(),
             themeAccent != null ? themeAccent.key() : "blue",
             themeCustom != null ? themeCustom : Map.of(),
             redDotEnabled, hideChatIcon, animationEnabled,
@@ -258,7 +260,7 @@ public class ChatBubbleConfigScreen extends Screen {
 
     private void loadFromConfig() {
         var cfg = ChatBubbleClientSetup.config();
-        try { theme = ChatBubbleTheme.valueOf(cfg.theme().toUpperCase()); } catch (Exception e) { theme = ChatBubbleTheme.DARK; }
+        theme = ChatBubbleTheme.parse(cfg.theme());
         themeAccent = ChatBubbleTheme.Accent.parse(cfg.themeAccent());
         themeCustom = cfg.themeCustom() != null ? new HashMap<>(cfg.themeCustom()) : new HashMap<>();
         enabled = cfg.enabled(); redDotEnabled = cfg.redDotEnabled();
@@ -364,8 +366,8 @@ public class ChatBubbleConfigScreen extends Screen {
         com.niuqu.chatbubble.texture.ColoredTextureRenderer.drawWithAlpha(g,
             com.niuqu.chatbubble.texture.UiTextureManager.rl(com.niuqu.chatbubble.texture.UiElement.SCROLLBAR_TRACK, texTheme()),
             trackX, top, SCROLLBAR_W, bot - top, 0x40 / 255f);
-        int base = dragging ? 0xCC
-            : sbHovering((int) mx, (int) my, trackX, ty, th) ? 0xAA : 0x88;
+        int base = dragging ? 0xFF
+            : sbHovering((int) mx, (int) my, trackX, ty, th) ? 0xE6 : 0xCC;
         com.niuqu.chatbubble.texture.ColoredTextureRenderer.drawWithAlpha(g,
             com.niuqu.chatbubble.texture.UiTextureManager.rl(com.niuqu.chatbubble.texture.UiElement.SCROLLBAR_THUMB, texTheme()),
             trackX, ty, SCROLLBAR_W, th, base / 255f);
@@ -490,8 +492,12 @@ public class ChatBubbleConfigScreen extends Screen {
         SectionDef.of("e33chat.config.section.panel",
             OptionDef.themeCycle("e33chat.config.theme", new Ref<>(() -> theme, v -> theme = v)),
             OptionDef.accentCycle("e33chat.config.theme_accent", new Ref<>(() -> themeAccent, v -> themeAccent = v)),
-            OptionDef.hex("e33chat.config.custom_accent", Ref.s(() -> themeCustom.getOrDefault("accent", ""), v -> themeCustom.put("accent", v))),
-            OptionDef.hex("e33chat.config.custom_panel_bg", Ref.s(() -> themeCustom.getOrDefault("panelBg", ""), v -> themeCustom.put("panelBg", v))),
+            OptionDef.hex("e33chat.config.custom_accent", Ref.s(
+                () -> themeCustom.getOrDefault("accent", ""),
+                v -> { if (v == null || v.isEmpty()) themeCustom.remove("accent"); else themeCustom.put("accent", v); })),
+            OptionDef.hex("e33chat.config.custom_panel_bg", Ref.s(
+                () -> themeCustom.getOrDefault("panelBg", ""),
+                v -> { if (v == null || v.isEmpty()) themeCustom.remove("panelBg"); else themeCustom.put("panelBg", v); })),
             OptionDef.intBox("e33chat.config.panel_width", Ref.i(() -> panelWidth, v -> panelWidth = v), 800, 1600, 4),
             OptionDef.bool("e33chat.config.blur_enabled", Ref.b(() -> blurEnabled, v -> blurEnabled = v)),
             OptionDef.intBox("e33chat.config.panel_opacity", Ref.i(() -> panelOpacity, v -> panelOpacity = v), 0, 100, 3),
@@ -620,6 +626,7 @@ public class ChatBubbleConfigScreen extends Screen {
             int idx = i;
             chat.add(Opt.multi("e33chat.config.blocked_players", y -> {
                 TextFieldWidget box = new TextFieldWidget(textRenderer, inputX, y, INPUT_W - 24, 20, Text.literal(""));
+box.setTextShadow(false);
                 box.setText(blockedPlayers.get(idx));
                 box.setMaxLength(32);
                 box.setChangedListener(s -> {
@@ -669,6 +676,7 @@ public class ChatBubbleConfigScreen extends Screen {
                 Ref<String> r = (Ref<String>) d.ref();
                 yield new Opt(d.key(), y -> {
                     TextFieldWidget box = new TextFieldWidget(textRenderer, inputX, y, INPUT_W, 20, Text.literal(""));
+box.setTextShadow(false);
                     box.setText(r.getter().get());
                     box.setMaxLength(512);
                     box.setChangedListener(r.setter()::accept);
@@ -785,11 +793,10 @@ public class ChatBubbleConfigScreen extends Screen {
 
     private ButtonWidget mkThemeButton(int y) {
         return ButtonWidget.builder(
-            Text.translatable("e33chat.theme." + theme.name().toLowerCase()),
+            Text.translatable("e33chat.theme." + theme.key()),
             btn -> {
-                int next = (theme.ordinal() + 1) % ChatBubbleTheme.values().length;
-                theme = ChatBubbleTheme.values()[next];
-                btn.setMessage(Text.translatable("e33chat.theme." + theme.name().toLowerCase()));
+                theme = theme.next();
+                btn.setMessage(Text.translatable("e33chat.theme." + theme.key()));
             }
         ).position(inputX, y).size(INPUT_W, 20).build();
     }
@@ -813,7 +820,8 @@ public class ChatBubbleConfigScreen extends Screen {
             Text.translatable("e33chat.config.anim_style." + getter.get()),
             btn -> {
                 AnimationStyle[] values = AnimationStyle.values();
-                int next = (java.util.Arrays.asList(values).indexOf(AnimationStyle.valueOf(getter.get().toUpperCase())) + 1) % values.length;
+                // 手改配置可能写进非法值；parse() 会回退 SLIDE，避免 valueOf 直接抛异常
+                int next = (AnimationStyle.parse(getter.get()).ordinal() + 1) % values.length;
                 setter.accept(values[next].name().toLowerCase());
                 btn.setMessage(Text.translatable("e33chat.config.anim_style." + getter.get()));
             }
@@ -921,10 +929,16 @@ public class ChatBubbleConfigScreen extends Screen {
 
     private TextFieldWidget mkHexBox(int y, String initial, java.util.function.Consumer<String> onChange) {
         TextFieldWidget box = new TextFieldWidget(textRenderer, inputX, y, INPUT_W, 20, Text.literal(""));
+box.setTextShadow(false);
         box.setText(initial);
         box.setMaxLength(7);
         box.setChangedListener(s -> {
             if (!s.matches("#?[0-9a-fA-F]{0,6}")) return;
+            // 清空输入框（或只剩 "#"）= 恢复默认：把空串回传给 Ref，由各字段决定如何回退
+            if (s.isEmpty() || s.equals("#")) {
+                onChange.accept("");
+                return;
+            }
             if (s.length() == 6 && !s.startsWith("#")) {
                 box.setText("#" + s);
                 onChange.accept("#" + s);
@@ -937,6 +951,7 @@ public class ChatBubbleConfigScreen extends Screen {
 
     private TextFieldWidget mkIntBox(int y, String initial, int min, int max, int maxLen, java.util.function.IntConsumer onChange) {
         TextFieldWidget box = new TextFieldWidget(textRenderer, inputX, y, INPUT_W, 20, Text.literal(""));
+box.setTextShadow(false);
         box.setText(initial);
         box.setMaxLength(maxLen);
         box.setChangedListener(s -> {
@@ -951,6 +966,7 @@ public class ChatBubbleConfigScreen extends Screen {
 
     private TextFieldWidget mkPatternBox(int y, List<String> initial, java.util.function.Consumer<List<String>> onChange) {
         TextFieldWidget box = new TextFieldWidget(textRenderer, inputX, y, INPUT_W, 20, Text.literal(""));
+box.setTextShadow(false);
         box.setText(String.join(", ", initial));
         box.setMaxLength(200);
         box.setChangedListener(s -> {
@@ -985,7 +1001,7 @@ public class ChatBubbleConfigScreen extends Screen {
             boolean sel = i == selectedCat;
             boolean hover = mouseX >= CAT_X && mouseX <= CAT_X + CAT_W && mouseY >= ly && mouseY < ly + CAT_ROW_H;
             if (sel || hover)
-                g.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, com.niuqu.chatbubble.texture.UiTextureManager.rl(com.niuqu.chatbubble.texture.UiElement.HOVER_BG, texTheme()), CAT_X, ly, 0f, 0f, CAT_W, CAT_ROW_H, 16, 16, 16, 16);
+                com.niuqu.chatbubble.texture.ColoredTextureRenderer.drawWithAlpha(g, com.niuqu.chatbubble.texture.UiTextureManager.rl(com.niuqu.chatbubble.texture.UiElement.HOVER_BG, texTheme()), CAT_X, ly, CAT_W, CAT_ROW_H, 1f);
             if (sel)
                 g.fill(CAT_X, ly, CAT_X + 2, ly + CAT_ROW_H, c().configTitle());
             drawTriangle(g, CAT_X + 6, ly + (CAT_ROW_H - 5) / 2, expanded[i],
@@ -1000,7 +1016,7 @@ public class ChatBubbleConfigScreen extends Screen {
                     boolean selSub = i == selectedCat && sub == selectedSub;
                     boolean sh = mouseX >= CAT_X + 14 && mouseX <= CAT_X + CAT_W && mouseY >= ly && mouseY < ly + SUB_ROW_H;
                     if (selSub || sh)
-                        g.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, com.niuqu.chatbubble.texture.UiTextureManager.rl(com.niuqu.chatbubble.texture.UiElement.HOVER_BG, texTheme()), CAT_X + 14, ly, 0f, 0f, CAT_W - 14, SUB_ROW_H, 16, 16, 16, 16);
+                        com.niuqu.chatbubble.texture.ColoredTextureRenderer.drawWithAlpha(g, com.niuqu.chatbubble.texture.UiTextureManager.rl(com.niuqu.chatbubble.texture.UiElement.HOVER_BG, texTheme()), CAT_X + 14, ly, CAT_W - 14, SUB_ROW_H, 1f);
                     if (selSub)
                         g.fill(CAT_X + 14, ly, CAT_X + 16, ly + SUB_ROW_H, c().configTitle());
                     g.drawText(textRenderer, Text.translatable(o.key()), CAT_X + 24, ly + (SUB_ROW_H - 8) / 2,
@@ -1013,7 +1029,7 @@ public class ChatBubbleConfigScreen extends Screen {
         g.disableScissor();
         drawBar(g, tTrackX(), START_Y, viewBottom(), tTotalH(), treePane.offset(), calcTreeMaxScroll(), mouseX, mouseY, treePane.dragging());
 
-        g.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, com.niuqu.chatbubble.texture.UiTextureManager.rl(com.niuqu.chatbubble.texture.UiElement.DIVIDER, texTheme()), dividerX, START_Y - 6, 0f, 0f, 1, viewBottom() - (START_Y - 6), 16, 16, 16, 16);
+        com.niuqu.chatbubble.texture.ColoredTextureRenderer.drawWithAlpha(g, com.niuqu.chatbubble.texture.UiTextureManager.rl(com.niuqu.chatbubble.texture.UiElement.DIVIDER, texTheme()), dividerX, START_Y - 6, 1, viewBottom() - (START_Y - 6), 1f);
 
         if (showPreview()) drawBubblePreview(g);
 
@@ -1026,7 +1042,7 @@ public class ChatBubbleConfigScreen extends Screen {
                 int lineX = optLabelX + textRenderer.getWidth(label) + 8;
                 int lineEnd = optLabelX + optAreaW() + 4;
                 if (lineX < lineEnd)
-            g.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, com.niuqu.chatbubble.texture.UiTextureManager.rl(com.niuqu.chatbubble.texture.UiElement.DIVIDER, texTheme()), lineX, y + 15, 0f, 0f, lineEnd - lineX, 1, 16, 16, 16, 16);
+            com.niuqu.chatbubble.texture.ColoredTextureRenderer.drawWithAlpha(g, com.niuqu.chatbubble.texture.UiTextureManager.rl(com.niuqu.chatbubble.texture.UiElement.DIVIDER, texTheme()), lineX, y + 15, lineEnd - lineX, 1, 1f);
                 y += HEADER_H;
                 continue;
             }
@@ -1084,7 +1100,7 @@ public class ChatBubbleConfigScreen extends Screen {
         int mx = optLabelX + optAreaW() - mw;
         RoundRectRenderer.fill(g, mx, top + 22, mx + mw, top + 36, rad, own);
         g.drawText(textRenderer, ownMsg, mx + 4, top + 25, ownT, false);
-        g.drawTexture(net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED, com.niuqu.chatbubble.texture.UiTextureManager.rl(com.niuqu.chatbubble.texture.UiElement.DIVIDER, texTheme()), optLabelX - 4, top + PREVIEW_H - 1, 0f, 0f, optAreaW() + 8, 1, 16, 16, 16, 16);
+        com.niuqu.chatbubble.texture.ColoredTextureRenderer.drawWithAlpha(g, com.niuqu.chatbubble.texture.UiTextureManager.rl(com.niuqu.chatbubble.texture.UiElement.DIVIDER, texTheme()), optLabelX - 4, top + PREVIEW_H - 1, optAreaW() + 8, 1, 1f);
     }
 
     private void drawPreview(DrawContext g, int y, String hex) {

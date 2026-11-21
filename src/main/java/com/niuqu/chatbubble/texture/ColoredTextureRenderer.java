@@ -26,6 +26,7 @@ public final class ColoredTextureRenderer {
     public static void drawWithAlpha(DrawContext g, Identifier tex,
                                      int x, int y, int w, int h, float alpha) {
         if (w <= 0 || h <= 0 || alpha <= 0.003f) return;
+        if (SkinRenderer.draw(g, tex, x, y, w, h, alpha)) return;
         g.drawTexture(RenderPipelines.GUI_TEXTURED, tex, x, y, 0f, 0f, w, h, w, h, argbAlpha(alpha));
     }
 

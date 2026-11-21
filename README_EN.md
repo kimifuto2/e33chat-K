@@ -11,7 +11,7 @@
   <img alt="Loader" src="https://img.shields.io/badge/Loader-Forge%20%7C%20NeoForge%20%7C%20Fabric-orange">
   <img alt="Side" src="https://img.shields.io/badge/Side-Client%20required,%20server%20optional-blue">
   <img alt="Java" src="https://img.shields.io/badge/Java-17%2B%20%7C%2021%2B-yellow">
-  <img alt="Version" src="https://img.shields.io/badge/Version-3.1.2-informational">
+  <img alt="Version" src="https://img.shields.io/badge/Version-3.2.0-informational">
   <img alt="License" src="https://img.shields.io/badge/License-MIT-brightgreen">
 </p>
 
@@ -93,6 +93,7 @@ E33Chat is a chat-enhancement mod that rebuilds the vanilla chat HUD in a chat-a
 - 👤 **Head actions** — Right-click **another player's** head to open the interaction-action menu (pat / poke / pinch / kick / rub / spray / hug / blow / custom); left-click to @ them
 - 👥 **Group chat** — Server-relayed group conversations: create a group from the sidebar, invite online players, accept / decline from a banner, group rows with 3×3 avatar tiles, unread dot and per-group do-not-disturb, plus group settings (rename / add members / kick / disband / leave)
 - ✋ **Interaction actions** — 8 built-in verbs plus a one-shot custom verb, rendered as a centered system line; the audience follows the current conversation (public / group / whisper) and never leaks across views
+- 🎨 **Theme system** — 7 built-in themes (Dark / Beige / Blue / Green / Cyan / Pink / Orange) × 6 accents + 42 per-field custom colors; panels, sidebar, input, scrollbars, bubbles, command suggestions, banners and HUD hints all follow the theme
 - 🎵 **Music capsule** — With DangoMusic installed the notification island shows cover / title / artist / playback time (`1:26 / 3:35`) for the current track (no progress bar since 3.1.1); while the chat panel is open the capsule is placed **below** the panel so it never covers the newest messages
 - 🚫 **Block players** — A blocked player's messages vanish completely (vanilla chat / bubbles / banners / sounds); blocking takes effect instantly and purges their history, never restored on rejoin; manage the list in Settings → Chat → Blocked List (exact names, comma-separated)
 - 🔔 **Notification banner** — Slide-in popup at the top covering @ / quote / whisper / system (system banner on by default); master volume slider with per-type toggles
