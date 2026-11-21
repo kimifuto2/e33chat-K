@@ -349,7 +349,7 @@ public class ChannelDietScreen extends Screen {
         ColoredTextureRenderer.drawWithAlpha(g,
             UiTextureManager.rl(UiElement.SCROLLBAR_TRACK, Appearance.resolvedTheme()),
             trackX(), top, SCROLLBAR_W, trackH, 0x40 / 255f);
-        int alpha = pane.dragging() ? 0xCC : (hovering ? 0xAA : 0x88);
+        int alpha = pane.dragging() ? 0xFF : (hovering ? 0xE6 : 0xCC);
         ColoredTextureRenderer.drawWithAlpha(g,
             UiTextureManager.rl(UiElement.SCROLLBAR_THUMB, Appearance.resolvedTheme()),
             trackX(), thumbY, SCROLLBAR_W, thumbH, alpha / 255f);
@@ -357,9 +357,10 @@ public class ChannelDietScreen extends Screen {
 
     private void drawDivider(UiCanvas g, int x1, int x2, int y) {
         if (x2 <= x1) return;
-        g.drawTexture(RenderPipelines.GUI_TEXTURED,
+        // DIVIDER 在彩色主题下是 skin/* 代码皮肤标识，必须走 drawWithAlpha 才会被 SkinRenderer 接管
+        ColoredTextureRenderer.drawWithAlpha(g,
             UiTextureManager.rl(UiElement.DIVIDER, Appearance.resolvedTheme()),
-            x1, y, 0f, 0f, x2 - x1, 1, 16, 16, 16, 16);
+            x1, y, x2 - x1, 1, 1f);
     }
 
     /** 主题色里强调色系字段的 alpha 可能是 0（Accent.rgb 不带 alpha），fill 前强制不透明。 */

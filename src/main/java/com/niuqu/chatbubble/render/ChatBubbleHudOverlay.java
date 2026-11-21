@@ -33,8 +33,7 @@ public class ChatBubbleHudOverlay {
     private static ChatBubbleConfig cfg() { return ChatBubbleClientSetup.config(); }
 
     private static Identifier chatIconTex() {
-        String theme = Appearance.resolvedTheme().name().toLowerCase();
-        return Identifier.fromNamespaceAndPath("e33chat", "textures/gui/" + theme + "/chat_icon.png");
+        return com.niuqu.chatbubble.texture.UiTextureManager.png("chat_icon", Appearance.resolvedTheme());
     }
 
     private static ChatBubbleTheme theme() {
@@ -102,7 +101,7 @@ public class ChatBubbleHudOverlay {
             String keyDisplay = "[" + keyName + "]";
             int keyW = mc.font.width(keyDisplay);
             int keyX = keyW > ICON_S ? x : x + (ICON_S - keyW) / 2;
-            g.drawText(mc.font, keyDisplay, keyX, textY, 0xFFFFFFFF, false);
+            g.drawText(mc.font, keyDisplay, keyX, textY, hintColor(), false);
         }
 
         g.getMatrices().popMatrix();
@@ -154,13 +153,18 @@ public class ChatBubbleHudOverlay {
     }
 
 
+    private static int hintColor() {
+        return 0xFF000000 | (c().quoteBar() & 0xFFFFFF);
+    }
+
     private static void drawIcon(UiCanvas g, int x, int y) {
-        // getTexture 无缓存时自动 new ResourceTexture 懒加载（资源包可覆盖，F3+T 即时生效）
-        g.drawTexture(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED, chatIconTex(), x, y, 0.0F, 0.0F, ICON_S, ICON_S, ICON_S, ICON_S);
+        // 白色剪影 PNG × 主题强调色 tint（资源包仍可覆盖 PNG，F3+T 即时生效）
+        com.niuqu.chatbubble.texture.ColoredTextureRenderer.drawTinted(g, chatIconTex(), x, y, ICON_S, ICON_S, hintColor());
     }
 
     private static void drawScaledTip(UiCanvas g, int x, int y, int disp) {
         Identifier tex = ChatBubbleScreen.iconTex("private_tip");
-        g.drawTexture(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED, tex, x, y, (float) SRC_U, (float) SRC_V, disp, disp, SRC_S, SRC_S, 16, 16);
+        com.niuqu.chatbubble.texture.ColoredTextureRenderer.drawTinted(g, tex, x, y, disp, disp,
+            (float) SRC_U, (float) SRC_V, SRC_S, SRC_S, 16, 16, hintColor());
     }
 }

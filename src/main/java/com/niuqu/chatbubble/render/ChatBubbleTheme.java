@@ -1,10 +1,48 @@
 package com.niuqu.chatbubble.render;
 
 import java.util.Map;
+import java.util.Locale;
 
 public enum ChatBubbleTheme {
     DARK,
-    LIGHT;
+    BEIGE,
+    BLUE,
+    GREEN,
+    CYAN,
+    PINK,
+    ORANGE;
+
+    public ChatBubbleTheme next() {
+        ChatBubbleTheme[] themes = values();
+        return themes[(ordinal() + 1) % themes.length];
+    }
+
+    public String key() {
+        return name().toLowerCase(Locale.ROOT);
+    }
+
+    public boolean isLight() {
+        return this == BEIGE || this == PINK || this == ORANGE;
+    }
+
+    /** Keep the legacy resource-pack directories independent of the theme IDs. */
+    public String textureDirectory() {
+        return isLight() ? "light" : "dark";
+    }
+
+    public static ChatBubbleTheme parse(String value) {
+        if (value == null) return DARK;
+        return switch (value.trim().toLowerCase(Locale.ROOT)) {
+            case "dark", "mono" -> DARK;
+            case "beige", "light" -> BEIGE;
+            case "blue", "midnight" -> BLUE;
+            case "green", "forest" -> GREEN;
+            case "cyan", "ocean" -> CYAN;
+            case "pink", "sakura" -> PINK;
+            case "orange", "autumn" -> ORANGE;
+            default -> DARK;
+        };
+    }
 
     // ==== 免打扰（DND）紫 ====
     // 免打扰语义的颜色是**紫色**，与强调色（accent，默认蓝）解耦：@提及/选中行仍走强调色，
@@ -20,22 +58,27 @@ public enum ChatBubbleTheme {
 
     /** 当前主题的免打扰紫：图标染色与按钮描边用它（深色亮紫 / 浅色蓝紫）。 */
     public int dndAccent() {
-        return this == LIGHT ? DND_PURPLE_LIGHT : DND_PURPLE;
+        return isLight() ? DND_PURPLE_LIGHT : DND_PURPLE;
     }
 
     /** 当前主题的免打扰按钮「启用态」内层填充紫（比 {@link #dndAccent()} 深一档）。 */
     public int dndFill() {
-        return this == LIGHT ? DND_FILL_LIGHT : DND_FILL_DARK;
+        return isLight() ? DND_FILL_LIGHT : DND_FILL_DARK;
     }
 
     /** 主题明暗模式：DARK=暗色，LIGHT=浅色。 */
     public enum ColorMode {
         DARK,
-        LIGHT;
+        BEIGE,
+        BLUE,
+        GREEN,
+        CYAN,
+        PINK,
+        ORANGE;
 
         public static ColorMode parse(String s) {
             if (s == null) return DARK;
-            return s.equalsIgnoreCase("light") ? LIGHT : DARK;
+            return valueOf(ChatBubbleTheme.parse(s).name());
         }
 
         public String key() {
@@ -91,43 +134,45 @@ public enum ChatBubbleTheme {
     ) {}
 
     public Colors colors() {
+        if (this != DARK && this != BEIGE) return ThemePreset.colors(this);
         return switch (this) {
             case DARK -> new Colors(
                 0xD01E1E1E, 0xFF242424, 0xFF242424,
                 0xFF1A1A1A, 0xFF2A2A2A, 0xFF3A3A3A, 0xFF333333,
                 0xFF333333, 0xFF2A2A2A,
                 0xFFFFFFFF, 0xFFAAAAAA, 0xFF888888,
-                0xFFCCCCCC, 0xFF999999,
-                0xB31E1E1E, 0xB3444444, 0xFFFFFFFF,
-                0xEE2A2A2A, 0xFF4A4A4A, 0xFFFFFFFF,
-                0xFF444444,
-                0xFFFFFF55, 0xAA7B2D8B,
+                0xFF1E90FF, 0xFF999999,
+                0xB31E1E1E, 0xB32A2A2A, 0xFFFFFFFF,
+                0xEE2A2A2A, 0xFF2A2A2A, 0xFFFFFFFF,
+                0xFF1E90FF,
+                0xFF1E90FF, 0xAA7B2D8B,
                 0xCC000000, 0xFFFFFFFF,
                 0x00FFFFFF, 0x00FFFFFF,
                 0xFF333333, 0xFF555555, 0xFFCCCCCC,
-                0xFF888888, 0xFFFFFFFF, 0xFFFFAA00,
+                0xFF888888, 0xFF1E90FF, 0xFF1E90FF,
                 0xFFFF0000, 0xFFFF4444,
                 0xFFFFFFFF, 0xFFFFAA00, 0xFFFFFFFF, 0xC0101010,
-                0xEE333333, 0xFFFFFF55, 0xFFFFFFFF
+                0xEE333333, 0xFF1E90FF, 0xFF1E90FF
             );
-            case LIGHT -> new Colors(
+            case BEIGE -> new Colors(
                 0x9AE8DFC8, 0xFFF0EDD8, 0xFFF0EDD8,
-                0xFFD8D5C2, 0xFFDED9C4, 0xFFC9C6B3, 0xFFC8C3AC,
+                0xFFD8D5C2, 0xFFDED6BF, 0xFFC9C0A7, 0xFFC8C3AC,
                 0xFFC8C3AC, 0xFFD8CEB5,
-                0xFF2D2D1F, 0xFF5A5A45, 0xFF787860,
-                0xFF2D2D1F, 0xFF787860,
-                0xDDF0EDD8, 0xDDE0DBC8, 0xFF2D2D1F,
-                0xFFF0EDD8, 0xFFDDD8C0, 0xFF2D2D1F,
+                0xFF30291F, 0xFF5A5040, 0xFF786F5C,
+                0xFF30291F, 0xFF786F5C,
+                0xDDF0EDD8, 0xDDE0DBC8, 0xFF30291F,
+                0xFFF0EDD8, 0xFFDDD8C0, 0xFF30291F,
                 0xFFD5D0B8,
                 0xFFFFAA00, 0xAA9966CC,
                 0xCC2D2D1F, 0xFFF5F0E0,
                 0x60706858, 0x90505848,
-                0xFFD5D0B8, 0xFFC0BBA3, 0xFF5A5A45,
-                0xFF787860, 0xFFCC6600, 0xFFCC6600,
+                0xFFD5D0B8, 0xFFC0BBA3, 0xFF5A5040,
+                0xFF786F5C, 0xFFA66B24, 0xFFA66B24,
                 0xFFCC0000, 0xFFFF2222,
-                0xFF2D2D1F, 0xFFCC6600, 0xFF2D2D1F, 0xC0EDE8D3,
-                0xEEF0EDD8, 0xFFCC6600, 0xFF471900
+                0xFF30291F, 0xFFA66B24, 0xFF30291F, 0xC0EDE8D3,
+                0xEEF0EDD8, 0xFFA66B24, 0xFF471900
             );
+            default -> throw new IllegalStateException();
         };
     }
 
@@ -137,38 +182,49 @@ public enum ChatBubbleTheme {
      * custom 为字段名（Colors record 的 component 名）→ ARGB 覆盖表。
      */
     public static Colors resolve(ColorMode mode, Accent accent, Map<String, Integer> custom) {
-        ChatBubbleTheme base = (mode == ColorMode.LIGHT) ? LIGHT : DARK;
+        ChatBubbleTheme base = switch (mode) {
+            default -> valueOf(mode.name());
+        };
         Colors b = base.colors();
         // 自定义强调色优先（custom["accent"]），否则用预设 accent。
+        boolean customAccent = custom != null && custom.containsKey("accent");
         int a = accent.rgb;
-        if (custom != null && custom.containsKey("accent")) {
+        if (customAccent) {
             a = custom.get("accent");
         }
+        boolean applyAccent = customAccent || accent != Accent.BLUE;
 
         // 强调色相关字段：向所选强调色靠拢，保留各自本色明度，观感协调。
         Colors out = new Colors(
             b.panelBg(), b.titleBg(), b.barBg(),
-            b.sidebarBg(), mix(b.sidebarItemHover(), a, 0.45), mix(b.sidebarItemSelected(), a, 0.55), b.sidebarDivider(),
+            b.sidebarBg(), applyAccent ? mix(b.sidebarItemHover(), a, 0.45) : b.sidebarItemHover(),
+            applyAccent ? mix(b.sidebarItemSelected(), a, 0.55) : b.sidebarItemSelected(), b.sidebarDivider(),
             b.divider(), b.inputBg(),
             b.textPrimary(), b.textSecondary(), b.textMuted(),
-            mix(b.nameColor(), a, 0.85), b.timeColor(),
+            applyAccent ? mix(b.nameColor(), a, 0.85) : b.nameColor(), b.timeColor(),
             b.popupBg(), b.popupHover(), b.popupText(),
-            b.contextBg(), mix(b.contextHover(), a, 0.35), b.contextText(),
-            a,
-            mix(b.notificationText(), a, 0.8), b.whisperBar(),
+            b.contextBg(), applyAccent ? mix(b.contextHover(), a, 0.35) : b.contextHover(), b.contextText(),
+            applyAccent ? a : b.iconHover(),
+            applyAccent ? mix(b.notificationText(), a, 0.8) : b.notificationText(), b.whisperBar(),
             b.toastBg(), b.toastText(),
             b.scrollbar(), b.scrollbarHover(),
-            b.closeBg(), mix(b.closeHoverBg(), a, 0.5), b.closeText(),
-            b.systemText(), mix(b.quoteBar(), a, 0.8), mix(b.duplicateLabel(), a, 0.85),
+            b.closeBg(), applyAccent ? mix(b.closeHoverBg(), a, 0.5) : b.closeHoverBg(), b.closeText(),
+            b.systemText(), applyAccent ? mix(b.quoteBar(), a, 0.8) : b.quoteBar(),
+            applyAccent ? mix(b.duplicateLabel(), a, 0.85) : b.duplicateLabel(),
             b.redDot(), b.redDotMention(),
-            b.configTitle(), mix(b.configSection(), a, 0.85), b.configLabel(), b.configBg(),
-            b.bannerBg(), bannerText(a), b.bannerBar()
+            b.configTitle(), applyAccent ? mix(b.configSection(), a, 0.85) : b.configSection(),
+            b.configLabel(), b.configBg(),
+            b.bannerBg(), applyAccent ? bannerText(a) : b.bannerText(), b.bannerBar()
         );
 
         if (custom != null && !custom.isEmpty()) {
             out = applyCustom(out, custom);
         }
         return out;
+    }
+
+    public static Colors resolve(ChatBubbleTheme theme, Accent accent, Map<String, Integer> custom) {
+        return resolve(ColorMode.valueOf(theme.name()), accent, custom);
     }
 
     /** 按 fieldName→ARGB 覆盖，忽略未知字段。 */

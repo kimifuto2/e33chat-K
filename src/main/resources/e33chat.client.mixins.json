@@ -13,6 +13,8 @@
     "MouseHandlerAccessor",
     "SuggestionWindowAccessor",
     "AwtHeadlessHackMixin",
-    "ChannelRegistrationDietMixin"
+    "ChannelRegistrationDietMixin",
+    "EditBoxSelectionMixin",
+    "SuggestionWindowColorMixin"
   ]
 }

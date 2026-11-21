@@ -144,7 +144,7 @@ public record ChatBubbleConfig(
             true, "dark", "blue", Map.of(), true, false, true,
             false, true,
             false, 0, 5, 1000, 4,
-            "#1E90FF", "#4A4A4A", "#FFFFFF", "#FFFFFF",
+            "", "#4A4A4A", "#FFFFFF", "#FFFFFF",
             false, false, true, false, true, false,
             List.of(), List.of(), List.of(),
             true, true, 4, true, true, true,

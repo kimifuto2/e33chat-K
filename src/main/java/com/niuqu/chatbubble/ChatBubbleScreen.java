@@ -156,8 +156,7 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
     }
 
     public static Identifier iconTex(String name) {
-        String theme = Appearance.resolvedTheme().name().toLowerCase();
-        return Identifier.fromNamespaceAndPath("e33chat", "textures/gui/" + theme + "/" + name + ".png");
+        return UiTextureManager.png(name, Appearance.resolvedTheme());
     }
 
 
@@ -172,6 +171,17 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
 
     public static int getInputX() { return inputX; }
     public static int getInputY() { return inputY; }
+    /** 指令候选窗底边：贴输入框视觉外框上沿，留 1px。 */
+    public static int suggestionWindowBottom() {
+        return inputY - INPUT_BOX_OUTSET - 1;
+    }
+
+    /** 命令用法提示行需要上移的像素数（原版按贴屏幕底设计，会压住本模组底栏）。 */
+    public int commandHintLift() {
+        int vanillaTop = height - 27;
+        int wantedTop = inputBarY() - INPUT_BOX_OUTSET - 13;
+        return Math.max(0, vanillaTop - wantedTop);
+    }
     private final String initialText;
     private String historyBuffer = "";
     private int historyPos = -1;
@@ -446,7 +456,7 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
         input = new EditBox(font, inputX, ibY + 3, inputW, INPUT_H, Component.literal(""));
         input.setMaxLength(256);
         input.setBordered(false);
-        int editColor = theme() == ChatBubbleTheme.LIGHT ? c().textSecondary() : c().textPrimary();
+        int editColor = c().textPrimary();
         input.setTextColor(editColor);
         input.setTextColorUneditable(c().textMuted());
         input.setValue(initialText.isEmpty() && ChatBubbleClientSetup.config().preserveInput() && !savedInput.isEmpty() ? savedInput : initialText);
@@ -460,9 +470,8 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
         // inputX/宽度一致（直接给 .x 赋值不会同步这两个字段）。
         layoutInputField();
 
-        int cmdBgAlpha = theme() == ChatBubbleTheme.LIGHT ? 0x99 : 0xDD;
         commandSuggestions = new CommandSuggestions(minecraft, this, input, font,
-            false, false, 0, 8, true, ChatBubbleTheme.alphaBlend(c().panelBg(), cmdBgAlpha));
+            false, false, 1, 8, true, 0xE0000000 | (c().quoteBar() & 0xFFFFFF));
         commandSuggestions.setAllowSuggestions(true);
         commandSuggestions.updateCommandInfo();
 
@@ -534,6 +543,11 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
             quickChatPanel.visible = false;
             quickChatInput.setVisible(false);
         });
+
+        // 输入框文字统一关闭原版阴影：浅色主题下 1px 错位的阴影会被看成“重影”
+        for (net.minecraft.client.gui.components.events.GuiEventListener e : this.children()) {
+            if (e instanceof net.minecraft.client.gui.components.EditBox eb) eb.setTextShadow(false);
+        }
     }
 
     private void rebuildLayout() {
@@ -886,6 +900,9 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
                 g.disableScissor();
             }
         }
+
+        // 侧边栏底部状态行与上方列表的分割线：与聊天区底栏上沿同一条 barTop 线。
+        ColoredTextureRenderer.drawWithAlpha(g, UiTextureManager.rl(UiElement.DIVIDER), 0, barTop, SIDEBAR_W - 1, 1, alpha);
 
         // 底部状态行：在线人数 / 单人游戏，画在底部输入栏那条带子里（不占列表高度）。
         // 列表的 scissor 停在 sidebarListBottom()（= 原版表达式 msgBottom > 0 ? msgBottom : height - BAR_H，
@@ -2074,7 +2091,7 @@ quickChatInput.setVisible(true);
         if (button == 0) {
             // 消息 textSelection 只在消息区按下时才激活：底栏（输入框等）里按下不能开始消息选区
 // 否则 ?scissor 裁掉 ?rect 仍被记录的消 ?span 会抢走输入框的按 ?拖选
-TextSpan hit = (mouseY >= msgTop && mouseY <= msgBottom) ? findTextSpanAt(mouseX, mouseY) : null;
+TextSpan hit = (mouseY >= msgTop && mouseY <= msgBottom) ? findSelectionSpanAt(mouseX, mouseY) : null;
             if (hit != null) {
                 if (textSelection.hasSelection()) textSelection.clear();
                 textSelection.begin(hit.messageIndex(), hit.lineIndex(), hit.kind(), charAt(hit, mouseX));
@@ -2711,7 +2728,10 @@ boolean selDrag = textSelection.isDragActive();
         }
         // 建议框定位基 ?input.getScreenX()（屏幕坐标），与 input 同坐标空间渲
         g.enableScissor(panelX, 0, panelX + panelW, height);
-        if (commandSuggestions != null) commandSuggestions.extractRenderState(raw, mouseX, mouseY);
+        if (commandSuggestions != null) {
+            syncSuggestionGeometry();
+            commandSuggestions.extractRenderState(raw, mouseX, mouseY);
+        }
         g.disableScissor();
         g.getMatrices().popMatrix();
 
@@ -3431,7 +3451,8 @@ boolean showAvatar = !(ChatBubbleClientSetup.config().hideRepeatedAvatars() != n
         String text = ChatMessageStore.formatTime(timeMillis);
         int tw = font.width(text);
         int tx = UiLayout.centerX(panelX, panelW, tw);
-        g.fill(tx - 6, y + 2, tx + tw + 6, y + TIME_SEP_H - 2, ChatBubbleTheme.alphaBlend(c().toastBg(), 0x44));
+        RoundRectRenderer.fill(g, tx - 6, y + 2, tx + tw + 6, y + TIME_SEP_H - 2, 6f,
+            ChatBubbleTheme.alphaBlend(c().toastBg(), 0x44));
         g.drawText(font, text, tx, y + 3, c().timeColor(), false);
     }
 
@@ -3545,6 +3566,45 @@ boolean showAvatar = !(ChatBubbleClientSetup.config().hideRepeatedAvatars() != n
         return maxW;
     }
 
+    /** 自己的气泡文字色：留空 / auto / 旧默认白 = 按气泡底色明暗自动取黑/白。 */
+    private int ownBubbleFg(int bg) {
+        String v = ChatBubbleClientSetup.config().ownTextColor();
+        if (v == null || v.isBlank() || v.equalsIgnoreCase("auto") || v.equalsIgnoreCase("#FFFFFF")) {
+            return isLightColor(bg) ? c().textPrimary() : 0xFFFFFFFF;
+        }
+        return ChatBubbleConfig.parseHexColor(v, 0xFFFFFFFF);
+    }
+
+    private static boolean isLightColor(int argb) {
+        double l = 0.2126 * ((argb >> 16) & 255) + 0.7152 * ((argb >> 8) & 255) + 0.0722 * (argb & 255);
+        return l > 140;
+    }
+
+    /** 自己的气泡底色：留空 / auto / 旧默认蓝 = 跟随主题强调色。 */
+    private int ownBubbleBg() {
+        String v = ChatBubbleClientSetup.config().ownBubbleColor();
+        if (v == null || v.isBlank() || v.equalsIgnoreCase("auto") || v.equalsIgnoreCase("#1E90FF")) {
+            return c().iconHover();
+        }
+        return ChatBubbleConfig.parseHexColor(v, c().iconHover());
+    }
+
+    /** 每帧把候选窗 / 用法提示同步到当前输入框位置（侧边栏开合后 input.getX() 会变）。 */
+    private void syncSuggestionGeometry() {
+        if (commandSuggestions == null) return;
+        com.niuqu.chatbubble.mixin.ChatInputSuggestorAccessor acc = (com.niuqu.chatbubble.mixin.ChatInputSuggestorAccessor) commandSuggestions;
+        int fieldX = input.getX();
+        acc.e33chat$setUsageX(fieldX);
+        acc.e33chat$setUsageWidth(input.getWidth());
+        net.minecraft.client.gui.components.CommandSuggestions.SuggestionsList window = acc.getWindow();
+        if (window == null) return;
+        net.minecraft.client.renderer.Rect2i area = ((com.niuqu.chatbubble.mixin.SuggestionWindowAccessor) window).getArea();
+        if (area == null) return;
+        int newY = suggestionWindowBottom() - area.getHeight();
+        if (area.getX() != fieldX) area.setX(fieldX);
+        if (area.getY() != newY) area.setY(newY);
+    }
+
     private void renderBubble(UiCanvas g, ChatMessageStore.ChatMessage msg, int index, int baseY, int mouseX, int mouseY, float alpha, boolean showAvatar) {
         if (msg.isSystem()) {
             // 第 4 轮：进群邀请（私聊里的系统消息）→ 正文 + 「接受 / 拒绝」按钮
@@ -3556,7 +3616,10 @@ boolean showAvatar = !(ChatBubbleClientSetup.config().hideRepeatedAvatars() != n
             List<FormattedCharSequence> lines = wrapContent(msg.content(), panelW - PAD * 2 - 20);
             int yy = baseY + 2;
             Style fb = findRootClickStyle(msg.content());
-            int sysColor = ChatBubbleTheme.alphaBlend(c().textMuted(), (int)(255 * alpha));
+            int sysColor = ChatBubbleTheme.alphaBlend(c().systemText(), (int)(255 * alpha));
+            int sysTextW = 0;
+            for (var l : lines) sysTextW = Math.max(sysTextW, font.width(l));
+            drawSystemBg(g, sysTextW, baseY, lines.size() * font.lineHeight + 4, alpha);
             // 系统消息没有气泡，但同样要能被右键（右键菜单对系统消息只给「复制」）：
             // 补一条与玩家气泡同一套的命中矩形（第 5 项是全量列表下标）。左键的两个
             // 命中循环（头像 @ / 头像菜单）都会先跳过 isSystem，所以不会被这条矩形影响。
@@ -3638,10 +3701,10 @@ boolean showAvatar = !(ChatBubbleClientSetup.config().hideRepeatedAvatars() != n
         int avatarY = baseY;
 
         int bg = own
-            ? ChatBubbleConfig.parseHexColor(ChatBubbleClientSetup.config().ownBubbleColor(), 0xFF1E90FF)
+            ? ownBubbleBg()
             : ChatBubbleConfig.parseHexColor(ChatBubbleClientSetup.config().otherBubbleColor(), c().contextHover());
         int fg = own
-            ? ChatBubbleConfig.parseHexColor(ChatBubbleClientSetup.config().ownTextColor(), 0xFFFFFFFF)
+            ? ownBubbleFg(bg)
             : ChatBubbleConfig.parseHexColor(ChatBubbleClientSetup.config().otherTextColor(), c().textPrimary());
 
         // 搜索命中高亮：先画一层圆角黄边（比气泡大 1px），再由气泡底色覆盖内部  ?圆角描边
@@ -3764,7 +3827,13 @@ boolean showAvatar = !(ChatBubbleClientSetup.config().hideRepeatedAvatars() != n
                                      int mouseX, int mouseY, float alpha) {
         List<FormattedCharSequence> lines = wrapContent(msg.content(), panelW - PAD * 2 - 20);
         int textH = lines.size() * font.lineHeight;
-        int sysColor = ChatBubbleTheme.alphaBlend(c().textMuted(), (int) (255 * alpha));
+        int sysColor = ChatBubbleTheme.alphaBlend(c().systemText(), (int) (255 * alpha));
+        int textW = 0;
+        for (var l : lines) textW = Math.max(textW, font.width(l));
+        int inviteBtnW = INVITE_BTN_W * 2 + INVITE_BTN_GAP;
+        int bgW = invite.handled() ? textW : Math.max(textW, inviteBtnW);
+        int bgH = textH + 4 + (invite.handled() ? 0 : INVITE_ROW_GAP + INVITE_BTN_H);
+        drawSystemBg(g, bgW, baseY, bgH, alpha);
         bubbleRects.add(new int[]{panelX + PAD, baseY, panelW - PAD * 2,
             textH + 4 + INVITE_ROW_GAP + INVITE_BTN_H, index});
 
@@ -3861,7 +3930,7 @@ boolean showAvatar = !(ChatBubbleClientSetup.config().hideRepeatedAvatars() != n
         int y = baseY + NAME_H;
         if (!lines.isEmpty()) {
             int fg = own
-                ? ChatBubbleConfig.parseHexColor(ChatBubbleClientSetup.config().ownTextColor(), 0xFFFFFFFF)
+                ? ownBubbleFg(ownBubbleBg())
                 : ChatBubbleConfig.parseHexColor(ChatBubbleClientSetup.config().otherTextColor(), c().textPrimary());
             Style fb = findRootClickStyle(msg.content());
             int fgA = ChatBubbleTheme.alphaBlend(fg, (int) (255 * alpha));
@@ -4125,6 +4194,54 @@ boolean showAvatar = !(ChatBubbleClientSetup.config().hideRepeatedAvatars() != n
         }
 
         g.drawText(font, draw, x, y, color, false);
+    }
+
+    /**
+     * 系统消息/通知统一底色：用主题侧边栏色 + 与输入框一致的圆角（6f）。
+     * 只画一层，不参与点击；文字/按钮仍画在它上面。
+     */
+    private void drawSystemBg(UiCanvas g, int contentW, int top, int contentH, float alpha) {
+        int pad = 4;
+        int w = Math.min(panelW - 8, contentW + pad * 2);
+        int x = panelX + (panelW - w) / 2;
+        // 与时间分隔信息一致的半透明观感：只铺 0x44 alpha，文字仍清晰可读。
+        RoundRectRenderer.fill(g, x, top, x + w, top + Math.max(10, contentH), 6f,
+            ChatBubbleTheme.alphaBlend(c().sidebarBg(), (int) (0x44 * alpha)));
+    }
+
+    /**
+     * 选区起点：先按文字精确命中；没命中时，如果按下的位置落在某条消息的气泡矩形里
+     * （名字行、引用、行间留白、文字左右边距都算），就取该消息最近的一条文本行。
+     * 这样“从文字旁边空白处开始拖选”也能生效，而不是必须压在字形上。
+     */
+    private TextSpan findSelectionSpanAt(double mouseX, double mouseY) {
+        TextSpan exact = findTextSpanAt(mouseX, mouseY);
+        if (exact != null) return exact;
+        int msgIndex = -1;
+        for (int i = bubbleRects.size() - 1; i >= 0; i--) {
+            int[] r = bubbleRects.get(i);
+            if (mouseX >= r[0] && mouseX <= r[0] + r[2]
+                && mouseY >= r[1] && mouseY <= r[1] + r[3]) {
+                msgIndex = r[4];
+                break;
+            }
+        }
+        if (msgIndex < 0) return null;
+        TextSpan best = null;
+        double bestDist = Double.MAX_VALUE;
+        for (TextSpan s : textSpans) {
+            if (s.messageIndex() != msgIndex) continue;
+            double cx = Math.max((double) s.x(), Math.min(mouseX, (double) (s.x() + s.w())));
+            double cy = Math.max((double) s.y(), Math.min(mouseY, (double) (s.y() + s.h())));
+            double dx = mouseX - cx;
+            double dy = mouseY - cy;
+            double dist = dx * dx + dy * dy;
+            if (dist < bestDist) {
+                bestDist = dist;
+                best = s;
+            }
+        }
+        return best;
     }
 
     private TextSpan findTextSpanAt(double mouseX, double mouseY) {
@@ -4484,9 +4601,9 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
                 setFocused(input);
                 break;
             case 2: { // theme
-                ChatBubbleTheme next = theme() == ChatBubbleTheme.DARK ? ChatBubbleTheme.LIGHT : ChatBubbleTheme.DARK;
-                ChatBubbleClientSetup.saveConfig(ChatBubbleClientSetup.config().withTheme(next.name().toLowerCase()));
-                        int editColor = next == ChatBubbleTheme.LIGHT ? c().textSecondary() : c().textPrimary();
+                ChatBubbleTheme next = theme().next();
+                ChatBubbleClientSetup.saveConfig(ChatBubbleClientSetup.config().withTheme(next.key()));
+                int editColor = c().textPrimary();
                 input.setTextColor(editColor);
                 input.setTextColorUneditable(c().textMuted());
                 sidebarSearchBox.setTextColor(editColor);
@@ -4495,9 +4612,8 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
                 quickChatInput.setTextColorUneditable(c().textMuted());
                 searchInput.setTextColor(editColor);
                 searchInput.setTextColorUneditable(c().textMuted());
-                int cmdAlpha = next == ChatBubbleTheme.LIGHT ? 0x99 : 0xDD;
                 commandSuggestions = new CommandSuggestions(minecraft, this, input, font,
-                    false, false, 0, 8, true, ChatBubbleTheme.alphaBlend(c().panelBg(), cmdAlpha));
+                    false, false, 1, 8, true, 0xE0000000 | (c().quoteBar() & 0xFFFFFF));
                 commandSuggestions.setAllowSuggestions(true);
                 break;
             }
@@ -4521,7 +4637,7 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
         int a255 = (int) (255 * panelAlpha);
         int barBg = ChatBubbleTheme.alphaBlend(c().barBg(), a255);
         // 1.21.11 restyle: rounded floating card instead of the flat textured strip ( ? style).
-        RoundRectRenderer.fill(g, panelX, barTop, panelX + panelW, height, 9f, barBg);
+        g.fill(panelX, barTop, panelX + panelW, height, barBg);
         ColoredTextureRenderer.drawWithAlpha(g, UiTextureManager.rl(UiElement.DIVIDER), panelX, barTop, panelW, 1, panelAlpha);
 
         int iconY = barTop + (BAR_H - ICON_S) / 2;

@@ -63,18 +63,18 @@ public class ChatQuickChatPanel {
             int trackX = phraseAreaRight;
             int trackTop = py + 4;
             int trackBottom = py + 4 + listH;
-            int trackRgb = c.scrollbar() & 0x00FFFFFF;
+            int trackRgb = c.divider() & 0x00FFFFFF;
             // 白色纹理 × tint 动态着色：颜色（主题色 + 透明度）由 tint 控制，纹理可覆盖
             com.niuqu.chatbubble.texture.ColoredTextureRenderer.drawTinted(g,
-                com.niuqu.chatbubble.texture.UiTextureManager.rl(com.niuqu.chatbubble.texture.UiElement.QUICK_SCROLLBAR_TRACK),
+                com.niuqu.chatbubble.texture.UiTextureManager.png("quick_scrollbar_track"),
                 trackX, trackTop, 3, trackBottom - trackTop, (0x30 << 24) | trackRgb);
             int thumbH = Math.max(6, listH * MAX_VISIBLE / totalPhrases);
             int maxScrollOff = totalPhrases - MAX_VISIBLE;
             int travelRange = listH - thumbH;
             int thumbY = trackTop + (maxScrollOff > 0 ? scrollOffset * travelRange / maxScrollOff : 0);
-            int thumbRgb = c.scrollbarHover() & 0x00FFFFFF;
+            int thumbRgb = c.quoteBar() & 0x00FFFFFF;
             com.niuqu.chatbubble.texture.ColoredTextureRenderer.drawTinted(g,
-                com.niuqu.chatbubble.texture.UiTextureManager.rl(com.niuqu.chatbubble.texture.UiElement.QUICK_SCROLLBAR_THUMB),
+                com.niuqu.chatbubble.texture.UiTextureManager.png("quick_scrollbar_thumb"),
                 trackX, thumbY, 3, thumbH, (0x70 << 24) | thumbRgb);
         }
 

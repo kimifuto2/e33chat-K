@@ -14,17 +14,41 @@ public final class Appearance {
     /** 解析出的基础明暗主题（DARK/LIGHT），纹理目录据此选择。 */
     public static ChatBubbleTheme resolvedTheme() {
         ChatBubbleConfig cfg = ChatBubbleClientSetup.config();
-        return ChatBubbleTheme.ColorMode.parse(cfg.theme()) == ChatBubbleTheme.ColorMode.LIGHT
-            ? ChatBubbleTheme.LIGHT : ChatBubbleTheme.DARK;
+        try {
+            return ChatBubbleTheme.parse(cfg.theme());
+        } catch (RuntimeException ignored) {
+            return ChatBubbleTheme.DARK;
+        }
     }
 
     /** 当前主题的颜色快照（含强调色与自定义覆盖）。 */
     public static ChatBubbleTheme.Colors snapshot() {
+        return snapshot(resolvedTheme());
+    }
+
+    /** 无自定义覆盖时的快照缓存：渲染每帧会调用几十上百次 c()/snapshot()。 */
+    private static ChatBubbleTheme cachedTheme;
+    private static ChatBubbleTheme.Accent cachedAccent;
+    private static ChatBubbleTheme.Colors cachedColors;
+
+    /** Resolves a local preview theme with the active accent and custom overrides. */
+    public static ChatBubbleTheme.Colors snapshot(ChatBubbleTheme theme) {
         ChatBubbleConfig cfg = ChatBubbleClientSetup.config();
-        ChatBubbleTheme.ColorMode mode = ChatBubbleTheme.ColorMode.parse(cfg.theme());
         ChatBubbleTheme.Accent accent = ChatBubbleTheme.Accent.parse(cfg.themeAccent());
-        Map<String, Integer> custom = parseCustom(cfg.themeCustom());
-        return ChatBubbleTheme.resolve(mode, accent, custom);
+        Map<String, String> raw = cfg.themeCustom();
+        // 只有「无自定义覆盖」这一最常见路径做缓存：主题/强调色一变就重算，
+        // 自定义覆盖存在时照旧解析（避免 map 原地修改导致缓存过期）。
+        if (raw == null || raw.isEmpty()) {
+            if (cachedColors != null && theme == cachedTheme && accent == cachedAccent) {
+                return cachedColors;
+            }
+            ChatBubbleTheme.Colors out = ChatBubbleTheme.resolve(theme, accent, Map.of());
+            cachedTheme = theme;
+            cachedAccent = accent;
+            cachedColors = out;
+            return out;
+        }
+        return ChatBubbleTheme.resolve(theme, accent, parseCustom(raw));
     }
 
     /** 自定义配色：字段名→ARGB，非法值丢弃。 */

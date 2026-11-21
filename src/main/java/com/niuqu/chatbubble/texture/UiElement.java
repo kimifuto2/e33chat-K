@@ -38,7 +38,6 @@ public enum UiElement {
 
     /** 渲染/注册用的纹理 ID（带 .png——ResourceTexture 原样查资源，不自动补后缀）。 */
     public Identifier rl(ChatBubbleTheme theme) {
-        return Identifier.fromNamespaceAndPath("e33chat",
-            "textures/gui/" + theme.name().toLowerCase() + "/" + path + ".png");
+        return UiTextureManager.png(path, theme);
     }
 }

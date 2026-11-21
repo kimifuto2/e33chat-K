@@ -111,6 +111,7 @@ public class GroupSettingsScreen extends GroupModal {
         super(host);
         this.groupId = groupId;
         nameField = new EditBox(tr, 0, 0, 120, 12, Component.empty());
+            nameField.setTextShadow(false);
         nameField.setMaxLength(32);
         nameField.setBordered(false);
         nameField.setTextColor(GroupUi.colors().textPrimary());
@@ -122,6 +123,7 @@ public class GroupSettingsScreen extends GroupModal {
 
         // 成员搜索框（第 4 轮）：与「添加玩家」页的搜索框同款（无背景底、纯文字，底框自己画）
         searchField = new EditBox(tr, 0, 0, 120, 12, Component.empty());
+        searchField.setTextShadow(false);
         searchField.setMaxLength(32);
         searchField.setBordered(false);
         searchField.setTextColor(GroupUi.colors().textPrimary());
@@ -330,8 +332,25 @@ public class GroupSettingsScreen extends GroupModal {
         int[] actions = owner
             ? new int[]{ACT_ADD, ACT_DISBAND_OR_LEAVE, ACT_DONE}
             : new int[]{ACT_DISBAND_OR_LEAVE, ACT_DONE};
-        int total = BOTTOM_GAP * (widths.length - 1);
+        int gaps = BOTTOM_GAP * (widths.length - 1);
+        int total = gaps;
         for (int w : widths) total += w;
+        // 高 GUI Scale 下卡片宽度会缩到比固定按钮总宽更小（用户反馈 ×3/×4 时“完成”越出圆角边框）。
+        // 按可用宽度等比收缩按钮，并从卡片内边距开始排；按钮矩形只算一次，绘制/命中同源。
+        int available = Math.max(80, cardW - 16);
+        if (total > available) {
+            int content = Math.max(40, available - gaps);
+            int baseSum = 0;
+            for (int w : widths) baseSum += w;
+            int used = 0;
+            for (int i = 0; i < widths.length; i++) {
+                widths[i] = Math.max(28, content * widths[i] / Math.max(1, baseSum));
+                used += widths[i];
+            }
+            widths[widths.length - 1] = Math.max(28, widths[widths.length - 1] + content - used);
+            total = gaps;
+            for (int w : widths) total += w;
+        }
         int x = cardX + (cardW - total) / 2;
         for (int i = 0; i < widths.length; i++) {
             footerBtns.add(new int[]{x, btnY, widths[i], BTN_H, actions[i]});
