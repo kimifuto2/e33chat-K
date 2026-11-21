@@ -11,11 +11,13 @@
   <img alt="Loader" src="https://img.shields.io/badge/Loader-Forge%20%7C%20NeoForge%20%7C%20Fabric-orange">
   <img alt="Side" src="https://img.shields.io/badge/Side-Client%20required,%20server%20optional-blue">
   <img alt="Java" src="https://img.shields.io/badge/Java-17%2B%20%7C%2021%2B-yellow">
-  <img alt="Version" src="https://img.shields.io/badge/Version-3.1.2-informational">
+  <img alt="Version" src="https://img.shields.io/badge/Version-3.2.1-informational">
   <img alt="License" src="https://img.shields.io/badge/License-MIT-brightgreen">
 </p>
 
 E33Chat is a chat-enhancement mod that rebuilds the vanilla chat HUD in a chat-app style: bubbles with heads, @ mentions, a whisper sidebar, search, emoji & quick phrases, quote reply, notification banners, local chat history, and a fully reworked settings screen.
+
+![E33Chat feature map](docs/features.png)
 
 ---
 
@@ -86,6 +88,7 @@ E33Chat is a chat-enhancement mod that rebuilds the vanilla chat HUD in a chat-a
 - 👥 **Whisper sidebar** — Online player list, click a name to whisper; bouncing unread dot; separate whisper banner + sound; public / whisper split view
 - 🔍 **Chat search** — Real-time matching of message content and sender name, jump with up / down, Chinese supported
 - 😊 **Emoji & kaomoji** — Emoji panel + kaomoji picker, inserted at the cursor
+- 🖼️ **Image messages & viewer** — Up to 9 images per message with an optional caption, preview/remove and server-media or third-party fallback; double-click an image for a fullscreen viewer with cursor-anchored zoom, drag-pan, save / open in browser, and a 2048px hi-res cache
 - 📌 **Quick phrases** — Save common phrases and fill them with one click
 - 📋 **Copy & quote reply** — Right-click a message to copy or quote-reply
 - 👤 **Head actions** — Right-click a head to whisper / teleport / block, left-click to @

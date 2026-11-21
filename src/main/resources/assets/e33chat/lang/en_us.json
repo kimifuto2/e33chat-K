@@ -310,6 +310,7 @@
   "e33chat.channeldiet.mod.unknown": "Unknown / system",
   "e33chat.config.upload_url": "Upload host URL",
   "e33chat.config.upload_url.desc": "Blank = default host (uguu.se, ~3h expiry). Custom hosts need multipart POST: file field defaults to files[], extra fields to none, response defaults to json:files[0].url (override uploadField/uploadExtra/uploadResponse in the config file)",
+  "e33chat.image.full": "You can send at most 9 images at once",
   "e33chat.upload.start": "Uploading…",
   "e33chat.upload.failed": "Upload failed",
   "e33chat.upload.wait": "Image uploading, wait a moment…",
