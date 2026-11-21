@@ -148,7 +148,8 @@ public record ChatBubbleConfig(
             false, false, true, false, true, false,
             List.of(), List.of(), List.of(),
             true, true, 4, true, true, true,
-            false, 80, 80, false, false, false, 4, 0, 0, 3,
+            // 背景模糊默认开启（面板透明度 <100% 时生效）
+            true, 80, 80, false, false, false, 4, 0, 0, 3,
             "slide", "slide", "fade", "fade",
             true, true,
             null, null, null, null,

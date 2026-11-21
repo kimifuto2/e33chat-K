@@ -27,6 +27,9 @@ import com.niuqu.chatbubble.mixin.SuggestionWindowAccessor;
 import com.niuqu.chatbubble.render.TextSpan;
 import com.niuqu.chatbubble.store.GroupStore;
 import com.niuqu.chatbubble.ui.EmoteStore;
+import com.niuqu.chatbubble.ui.ImageMessageComposer;
+import com.niuqu.chatbubble.ui.ImageViewerOverlay;
+import com.niuqu.chatbubble.image.ImageBatchUploader;
 import com.niuqu.chatbubble.image.BracketCodec;
 import com.niuqu.chatbubble.image.ImageEntry;
 import com.niuqu.chatbubble.image.ImageLoader;
@@ -208,6 +211,11 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
 
 
     final ChatEmojiPanel emojiPanel = new ChatEmojiPanel();
+    final ImageMessageComposer imageComposer = new ImageMessageComposer();
+    final ImageViewerOverlay imageViewer = new ImageViewerOverlay();
+    private final List<ImageHit> imageHits = new ArrayList<>();
+
+    private record ImageHit(String url, int x, int y, int w, int h) {}
     final ChatSettingsMenu settingsMenu = new ChatSettingsMenu();
     final ChatSearchPanel searchPanel = new ChatSearchPanel();
     private TextFieldWidget searchInput;
@@ -343,6 +351,8 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
             @Override public void onRestoreInput(String text) { chatField.setText(text); }
         });
     private static final int EMOTE_MAX_SIZE = 32;
+    private static final int IMAGE_MAX_GUI = 160;
+    private static final int IMAGE_MAX_PHYSICAL = 320;
 
     // ── 第 4 轮：进群邀请消息里的「接受 / 拒绝」按钮（自绘，不走 ClickEvent）──────────
     // 复用 GroupUi.button 的圆角描边样式（与群设置/新建群聊的按钮同一套观感），
@@ -587,7 +597,7 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
 
     /** 输入框宽度的唯一算法（窄窗口下不能算出 0/负值，见 {@link #MIN_INPUT_W}）。 */
     private int inputFieldWidth(int inputX, int sendX) {
-        return Math.max(MIN_INPUT_W, sendX - ICON_S - 8 - inputX - INPUT_CURSOR_RESERVE);
+        return Math.max(MIN_INPUT_W, sendX - ICON_S * 2 - 12 - inputX - INPUT_CURSOR_RESERVE);
     }
 
     /** 底栏输入框**本体**的左边界（不含已选动作前缀）；绘制与布局都从这里取值。 */
@@ -1575,6 +1585,10 @@ private float getBarAlpha() {
 
     @Override
     public boolean keyPressed(KeyInput input) {
+        if (imageViewer.visible) {
+            imageViewer.keyPressed(input.key());
+            return true;
+        }
         // 群聊模态层优先：键盘（含 ESC = 只关模态、不关聊天面板 / 回车提交）全部先给它。
         // 模态打开时不希望聊天输入框、@ 补全、命令补全、侧边栏搜索框收到任何按键。
         if (activeGroupModal != null) {
@@ -1738,6 +1752,7 @@ if (this.getFocused() != null && this.getFocused().keyPressed(input))
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        if (imageViewer.visible) return imageViewer.mouseScrolled(mouseX, mouseY, scrollY, width, height);
         // 群聊模态层优先：滚轮只滚模态里的成员/玩家列表，不穿透到聊天记录
         if (activeGroupModal != null) {
             activeGroupModal.ensureLayout();
@@ -1779,6 +1794,7 @@ if (this.getFocused() != null && this.getFocused().keyPressed(input))
 
     @Override
     public boolean mouseClicked(Click click, boolean doubleClick) {
+        if (imageViewer.visible) return imageViewer.mouseClicked(click, doubleClick, width, height);
         double mouseX = click.x();
         double mouseY = click.y();
         int button = click.button();
@@ -1815,6 +1831,13 @@ if (this.getFocused() != null && this.getFocused().keyPressed(input))
         // the original coordinate.
         double origX = mouseX;
         if (isPanelSliding()) mouseX -= currentPanelOffset();
+
+        if (button == 0 && imageComposer.isInsideStrip(mouseX, mouseY, panelX, panelW, barTop)) {
+            int hit = imageComposer.handleClick(mouseX, mouseY, panelX, panelW, barTop);
+            if (hit >= 0) imageComposer.remove(hit);
+            else if (hit == ImageMessageComposer.CLICK_ADD) openImagePicker();
+            return true;
+        }
 
         // 第 4 轮：群聊「进群邀请」消息里的「接受 / 拒绝」按钮。
         // 命中矩形由上一帧渲染回填（屏幕坐标，已含滚动偏移），所以必须在面板位移还原之后、
@@ -2088,6 +2111,14 @@ quickChatInput.setVisible(true);
             }
         }
 
+        if (button == 0) {
+            ImageHit ih = imageAt(mouseX, mouseY);
+            if (ih != null) {
+                if (doubleClick) imageViewer.open(ih.url(), false);
+                return true;
+            }
+        }
+
         // 引用块跳转只认双击：单击不跳（保持选字/无操作），拖选经过引用块也不跳。
         // MC 把同一按键的快速第二击标成 doubleClick=true；第一击仍走下面的选区按下逻辑
         // 被吞掉，第二击在这里只跳一次（释放路径不再派发引用跳转，所以不会双跳）。
@@ -2209,6 +2240,7 @@ boolean inputHandled = this.chatField.mouseClicked(click, doubleClick);
 
     @Override
     public boolean mouseDragged(Click click, double dragX, double dragY) {
+        if (imageViewer.visible) return imageViewer.mouseDragged(click, width, height);
         // 群聊模态层优先：拖拽只用于模态输入框的拖选，不能变成聊天记录的选区/滚动条拖动
         if (activeGroupModal != null) {
             activeGroupModal.ensureLayout();
@@ -2264,6 +2296,7 @@ if (quotePressPending
 
     @Override
     public boolean mouseReleased(Click click) {
+        if (imageViewer.visible) return imageViewer.mouseReleased();
         // 群聊模态层优先：释放只用于模态输入框结束拖选
         if (activeGroupModal != null) {
             activeGroupModal.ensureLayout();
@@ -2299,6 +2332,16 @@ boolean selDrag = textSelection.isDragActive();
         return super.mouseReleased(click);
     }
 
+    private ImageHit imageAt(double mx, double my) {
+        // 图片可能被底栏盖住：底栏/输入框区域的点击绝不能命中图片。
+        if (my >= barTop || my < msgTop || my > msgBottom) return null;
+        for (int i = imageHits.size() - 1; i >= 0; i--) {
+            ImageHit h = imageHits.get(i);
+            if (mx >= h.x() && mx <= h.x() + h.w() && my >= h.y() && my <= h.y() + h.h()) return h;
+        }
+        return null;
+    }
+
     private boolean handleIconClick(int mx, int my) {
         int iconY = barTop + (BAR_H - ICON_S) / 2;
         int gearX = panelX + 4;
@@ -2316,6 +2359,14 @@ boolean selDrag = textSelection.isDragActive();
         }
         int sendX = panelX + panelW - PAD - ICON_S + 2;
         int emojiX = sendX - ICON_S - 4;
+        int imageX = emojiX - ICON_S - 4;
+        if (mx >= imageX && mx <= imageX + ICON_S && my >= iconY && my <= iconY + ICON_S) {
+            if (settingsMenu.visible) beginPopupClose(s -> settingsCloseStart = s, () -> settingsMenu.visible = false);
+            if (emojiPanel.visible) beginPopupClose(s -> emojiCloseStart = s, () -> emojiPanel.visible = false);
+            if (searchPanel.visible) closeSearchPanel();
+            openImagePicker();
+            return true;
+        }
         if (mx >= emojiX && mx <= emojiX + ICON_S && my >= iconY && my <= iconY + ICON_S) {
             if (settingsMenu.visible) beginPopupClose(s -> settingsCloseStart = s, () -> settingsMenu.visible = false);
             if (searchPanel.visible) closeSearchPanel();
@@ -2356,15 +2407,17 @@ boolean selDrag = textSelection.isDragActive();
             }
             return;
         }
+        java.util.List<java.io.File> dropped = new java.util.ArrayList<>();
         for (java.nio.file.Path p : paths) {
-            String l = p.getFileName().toString().toLowerCase();
-            if (l.endsWith(".png") || l.endsWith(".jpg") || l.endsWith(".jpeg")
-                    || l.endsWith(".gif") || l.endsWith(".bmp")) {
-                uploadQueue.enqueue(new com.niuqu.chatbubble.image.UploadQueue.UploadJob(p.toFile(), null, null, false, null));
-                // The OS drop can steal window focus; give it back to the chat input
-                // so typing keeps working right after a drag.
+            java.io.File f = p.toFile();
+            if (ImageMessageComposer.isImage(f)) dropped.add(f);
+        }
+        if (!dropped.isEmpty()) {
+            if (imageComposer.addAll(dropped) > 0) {
+                // OS drop can steal focus; give it back so the caption can be typed immediately.
                 client.execute(() -> setFocused(chatField));
-                return;
+            } else {
+                uploadToastTicks = 60;
             }
         }
     }
@@ -2692,6 +2745,7 @@ boolean selDrag = textSelection.isDragActive();
         renderContextMenu(g, mouseX, mouseY);
         renderToast(g);
         renderBottomBar(g, mouseX, mouseY, getBarAlpha());
+        imageComposer.render(g, mouseX, mouseY, textRenderer, c(), panelX, panelW, barTop, getBarAlpha());
         renderMentionPopup(g, mouseX, mouseY);
         // 弹层面板（设 ?表情/快捷/搜索）画在底栏之上，z 高一层——侧边栏 ?z 后画
         // 会盖住它们，提升弹层 z 到侧边栏之上避免遮挡
@@ -2765,6 +2819,8 @@ boolean selDrag = textSelection.isDragActive();
             activeGroupModal.ensureLayout();
             activeGroupModal.render(g, mouseX, mouseY, delta);
         }
+
+        imageViewer.render(g, textRenderer, mouseX, mouseY, width, height, c());
 
         // Notification banner is rendered by ChatBubbleHudOverlay at z=300
     }
@@ -3283,6 +3339,7 @@ boolean selDrag = textSelection.isDragActive();
             imageParseCache.clear();
         }
         bubbleRects.clear();
+        imageHits.clear();
         inviteButtons.clear();
         clickableSpans.clear();
         quoteRects.clear();
@@ -3618,8 +3675,15 @@ boolean showAvatar = !(ChatBubbleClientSetup.config().hideRepeatedAvatars() != n
     }
 
     /** Height in px for one bubble-less image (state-dependent, panel-clamped, never upscaled). */
+    private int imageDisplayMaxWidth() {
+        int usable = Math.max(80, panelW - Appearance.avatarSize() - PAD * 2 - 16);
+        int guiScale = Math.max(1, (int) Math.round(client.getWindow().getScaleFactor()));
+        int cap = Math.min(IMAGE_MAX_GUI, Math.max(80, IMAGE_MAX_PHYSICAL / guiScale));
+        return Math.min(usable, cap);
+    }
+
     private int imageEdgeHeight(String url) {
-        int maxW = Math.max(80, panelW - Appearance.avatarSize() - PAD * 2 - 16);
+        int maxW = imageDisplayMaxWidth();
         ImageEntry entry = ImageLoader.getOrLoad(url);
         if (entry != null && entry.state() == ImageEntry.State.LOADED
                 && entry.width() > 0 && entry.height() > 0) {
@@ -3992,7 +4056,7 @@ boolean showAvatar = !(ChatBubbleClientSetup.config().hideRepeatedAvatars() != n
 
         // Long-edge clamped to the panel's usable width so a narrow window/guiScale
         // can never push the image off-screen; small images keep their real size.
-        int maxImgW = Math.max(80, panelW - Appearance.avatarSize() - PAD * 2 - 16);
+        int maxImgW = imageDisplayMaxWidth();
 
         for (var ref : parsed.images()) {
             int w = maxImgW, h = maxImgW;
@@ -4022,9 +4086,9 @@ boolean showAvatar = !(ChatBubbleClientSetup.config().hideRepeatedAvatars() != n
             }
             // Open the URL in the system browser on click; hover shows the URL
             Style st = Style.EMPTY
-                .withClickEvent(new ClickEvent.OpenUrl(java.net.URI.create(ref.url())))
-                .withHoverEvent(new HoverEvent.ShowText(Text.literal(ref.url())));
+                .withClickEvent(new ClickEvent.OpenUrl(java.net.URI.create(ref.url())));
             clickableSpans.add(new ClickableSpan(imgX, y, w, h, st));
+            imageHits.add(new ImageHit(ref.url(), imgX, y, w, h));
             y += h + 2;
         }
 
@@ -4706,10 +4770,15 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
         int gearX = panelX + 4;
         int sendX = panelX + panelW - PAD - ICON_S + 2;
         int emojiX = sendX - ICON_S - 4;
+        int imageX = emojiX - ICON_S - 4;
 
         boolean hoverGear = mouseX >= gearX && mouseX <= gearX + ICON_S
             && mouseY >= iconY && mouseY <= iconY + ICON_S;
         drawIconButton(g, iconTex("settings"), gearX, iconY, ICON_S - 1, getAnimProgress(), hoverGear);
+
+        boolean hoverImage = mouseX >= imageX && mouseX <= imageX + ICON_S
+            && mouseY >= iconY && mouseY <= iconY + ICON_S;
+        drawIconButton(g, iconTex("image"), imageX, iconY, ICON_S - 1, getAnimProgress(), hoverImage);
 
         boolean hoverEmoji = mouseX >= emojiX && mouseX <= emojiX + ICON_S
             && mouseY >= iconY && mouseY <= iconY + ICON_S;
@@ -5168,7 +5237,77 @@ if (cmpLogged < 3 && quoteSenderMatches(m, owner.replySender())) {
         return path;
     }
 
+    private void openImagePicker() {
+        if (imageComposer.isFull()) {
+            client.player.sendMessage(Text.translatable("e33chat.image.full"), false);
+            return;
+        }
+        NativeFileDialog.pickImages(files -> {
+            if (files == null || files.isEmpty()) return;
+            int added = imageComposer.addAll(files);
+            if (added < files.size()) uploadToastTicks = 60;
+            setFocused(chatField);
+        });
+    }
+
+    private void sendPendingImages() {
+        if (!imageComposer.hasFiles()) return;
+        if (uploadBusyTicks > 0) return;
+        java.util.List<java.io.File> files = imageComposer.files();
+        String caption = chatField.getText().trim();
+        if (pendingAction != null) {
+            int n = actionPrefixLength(caption);
+            if (n > 0) caption = caption.substring(n).trim();
+            clearPendingAction();
+        }
+        if (caption.startsWith("/")) caption = "";
+        final String captionFinal = caption;
+        imageComposer.clear();
+        chatField.setText("");
+        savedInput = "";
+        uploadBusyTicks = 60;
+        ImageBatchUploader.upload(files, urls -> {
+            uploadBusyTicks = 0;
+            sendImageBatch(captionFinal, urls);
+        }, () -> {
+            uploadBusyTicks = 0;
+            uploadToastTicks = 60;
+            imageComposer.addAll(files);
+            if (!captionFinal.isEmpty() && chatField.getText().isEmpty()) chatField.setText(captionFinal);
+            setFocused(chatField);
+        });
+    }
+
+    /** 一条聊天行放不下 9 个图片 URL 时自动分条（原版/Paper 聊天通常 256 字符）。 */
+    private void sendImageBatch(String caption, java.util.List<String> urls) {
+        int max = isGroupConversation() ? 480 : 220;
+        StringBuilder line = new StringBuilder();
+        String pendingCaption = caption == null ? "" : caption;
+        if (!pendingCaption.isEmpty() && pendingCaption.length() > max) {
+            sendMessageText(pendingCaption);
+            pendingCaption = "";
+        }
+        for (String url : urls) {
+            String code = "[[CICode,url=" + url + "]]";
+            if (line.length() > 0 && line.length() + 1 + code.length() > max) {
+                sendMessageText(line.toString());
+                line.setLength(0);
+            }
+            if (line.length() == 0 && !pendingCaption.isEmpty()) {
+                line.append(pendingCaption);
+                pendingCaption = "";
+            }
+            if (line.length() > 0) line.append(' ');
+            line.append(code);
+        }
+        if (line.length() > 0) sendMessageText(line.toString());
+    }
+
     private void sendMessage() {
+        if (imageComposer.hasFiles()) {
+            sendPendingImages();
+            return;
+        }
         String raw = chatField.getText().trim();
         if (raw.isEmpty()) return;
         // 已选动作（拍了拍等）：前缀在**输入框文本里**（`【拍了拍】正文`），发送时按文本形态
