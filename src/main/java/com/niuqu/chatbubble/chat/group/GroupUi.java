@@ -99,7 +99,8 @@ public final class GroupUi {
         RoundRectRenderer.fill(g, x, y, x + w, y + h, BTN_RADIUS, border);
         RoundRectRenderer.fill(g, x + 1, y + 1, x + w - 1, y + h - 1, BTN_INNER_RADIUS, bg);
         if (hover && enabled) {
-            RoundRectRenderer.fill(g, x, y, x + w, y + h, BTN_RADIUS,
+            // 只铺内层，保留 1px 圆角描边（否则悬停色会盖掉边框）
+            RoundRectRenderer.fill(g, x + 1, y + 1, x + w - 1, y + h - 1, BTN_INNER_RADIUS,
                 ChatBubbleTheme.alphaBlend(primary ? 0xFFFFFFFF : c.popupHover(), primary ? 0x33 : 0xFF));
         }
         int textColor = !enabled ? ChatBubbleTheme.alphaBlend(c.textMuted(), 0xAA)
