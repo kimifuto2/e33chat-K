@@ -1,10 +1,12 @@
 # E33Chat · Minecraft 26.2 Fabric 版
 
 > **本分支：`mc26.2` · Minecraft 26.2（26.x 移植线）**
-> 产物：**`e33chat-Fabric-26.2-3.2.1.jar`**（709,812 字节 / ≈694 KiB） · 模组版本 **3.2.1**
+> 产物：**`e33chat-Fabric-26.2-3.2.1.jar`**（731,317 字节 / ≈714 KiB） · 模组版本 **3.2.1**
 > 仓库：[kimifuto2/e33chat-K](https://github.com/kimifuto2/e33chat-K) · 上游：[E33EPUS/E33Chat](https://github.com/E33EPUS/E33Chat)（MIT）
 >
 > 在 1.21.11 移植/增强版的基础上，把客户端**移植到 Minecraft 26.2**：功能集与 `main` 分支同源，主要差异在构建链与 26.x 平台 API（见「26.x 移植说明」）。
+
+![E33Chat 功能总览](docs/features.png)
 
 ## 分支矩阵
 
@@ -12,9 +14,9 @@
 
 | 分支 | Minecraft | 定位 | 产物 jar（3.2.1） | 大小 |
 |---|---|---|---|---|
-| `main` | 1.21.11 | 稳定线 | `e33chat-Fabric-1.21.11-3.2.1.jar` | 706,055 B |
-| `mc26.3` | 26.3 | 26.x 移植线 | `e33chat-Fabric-26.3-3.2.1.jar` | 709,830 B |
-| **`mc26.2`**（本分支） | 26.2 | 26.x 移植线 | `e33chat-Fabric-26.2-3.2.1.jar` | 709,812 B |
+| `main` | 1.21.11 | 稳定线 | `e33chat-Fabric-1.21.11-3.2.1.jar` | 727,788 B |
+| `mc26.3` | 26.3 | 26.x 移植线 | `e33chat-Fabric-26.3-3.2.1.jar` | 731,309 B |
+| **`mc26.2`**（本分支） | 26.2 | 26.x 移植线 | `e33chat-Fabric-26.2-3.2.1.jar` | 731,317 B |
 
 > 三个分支都在 **<https://github.com/kimifuto2/e33chat-K>** 下。**26.x 移植线**指 Mojang 改用年份版本号之后的版本，构建链与 1.21.11 差异很大（Java 25 / Gradle 9.8+ / Loom 1.19.3 / **不再混淆**）；`mc26.3` 与本分支环境基本相同，只有 Minecraft / Fabric API / 输入体系（GLFW vs SDL）不同（见「26.x 移植说明」最后一节）。
 
@@ -164,6 +166,17 @@ dependencies {
 | 提及 | `@名字` 跨玩家同步（Fabric 服务端与 Paper 插件同线格式）|
 | 兼容 | 插件可点击文本（未知 `ClickEvent` 交回原版处理）、Jade 描述框避让、皮肤异步加载、主线程卡顿看门狗 |
 | 网络 | 通道始终按连接注册/注销、**通道节食**（手动开关 + Paper 超 127 自动兜底） |
+| 图片消息 | **每条最多 9 张图 + 可选文字说明**；缩略图预览/删除/继续添加；优先服务端媒体，第三方图床兜底；超长自动分条 |
+| 图片查看器 | **双击打开全屏查看器**：鼠标锚点缩放、拖动、保存/浏览器打开；独立 2048px 高清缓存，主题化 UI |
+| 主题 | 背景模糊默认开启（面板透明度 <100% 时生效） |
+
+### 图片消息与全屏查看器（3.2.1）
+
+- **每条消息最多 9 张图片**，可附文字说明；输入框上方预览条支持悬停删除、继续添加；
+- 服务端媒体优先，第三方图床兜底；超过聊天长度自动分条；
+- **双击图片**打开全屏查看器：滚轮以鼠标为锚点缩放、左键拖动、查看器内保存 / 浏览器打开；
+- 聊天内图片显示上限 **160 逻辑 px / 320 物理 px**；查看器使用独立 **2048px** 高清缓存（最近 4 张）；
+- **背景模糊默认开启**（面板透明度 < 100% 时生效）。
 
 ### 通道节食（实验性，默认关闭）
 
@@ -281,6 +294,7 @@ java.lang.IllegalStateException: Cannot register channel. Too many channel regis
 | 配置项 | 说明 |
 |---|---|
 | `themeAccent` / `themeCustom` | 强调色 / 自定义配色 |
+| `blurEnabled` | 面板背景模糊（默认开启；面板透明度 <100% 时生效） |
 | `dndEnabled` | 公屏免打扰 |
 | `dndWhisperPlayers` | 已设为免打扰的私聊玩家名单 |
 | `publicOverlayEnabled` | 公屏消息小窗开关 |
@@ -303,7 +317,7 @@ gradle build
 
 | 文件 | 大小 |
 |---|---|
-| `build/libs/e33chat-Fabric-26.2-3.2.1.jar` | 709,812 B |
+| `build/libs/e33chat-Fabric-26.2-3.2.1.jar` | 731,317 B |
 | `build/libs/e33chat-Fabric-26.2-3.2.1-sources.jar` | 496,264 B |
 
 ---
