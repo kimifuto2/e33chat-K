@@ -1,7 +1,7 @@
 # E33Chat · Minecraft 1.21.11 Fabric 版
 
 > **本分支：`main` · Minecraft 1.21.11（稳定线）**
-> 产物：**`e33chat-Fabric-1.21.11-3.2.0.jar`**（708,153 字节 / ≈691 KiB） · 模组版本 **3.2.0**
+> 产物：**`e33chat-Fabric-1.21.11-3.2.0.jar`**（709,279 字节 / ≈693 KiB） · 模组版本 **3.2.0**
 > 仓库：[kimifuto2/e33chat-K](https://github.com/kimifuto2/e33chat-K) · 上游：[E33EPUS/E33Chat](https://github.com/E33EPUS/E33Chat)（MIT）
 >
 > 基于上游的 **1.21.11 Fabric 移植**，并在其上做了大量功能增强与缺陷修复：在保留原作者聊天界面风格的基础上，补齐了上游没有的交互与通知能力。
@@ -12,9 +12,9 @@
 
 | 分支 | Minecraft | 定位 | 产物 jar（各分支最新） | 大小 |
 |---|---|---|---|---|
-| **`main`**（本分支） | 1.21.11 | 稳定线 | `e33chat-Fabric-1.21.11-3.2.0.jar` | 708,153 B |
-| `mc26.3` | 26.3 | 26.x 移植线 | `e33chat-Fabric-26.3-3.1.5.jar` | 697,531 B |
-| `mc26.2` | 26.2 | 26.x 移植线 | `e33chat-Fabric-26.2-3.1.5.jar` | 697,496 B |
+| **`main`**（本分支） | 1.21.11 | 稳定线 | `e33chat-Fabric-1.21.11-3.2.0.jar` | 709,278 B |
+| `mc26.3` | 26.3 | 26.x 移植线 | `e33chat-Fabric-26.3-3.2.0.jar` | 713,034 B |
+| `mc26.2` | 26.2 | 26.x 移植线 | `e33chat-Fabric-26.2-3.2.0.jar` | 713,034 B |
 
 > 三个分支都在 **<https://github.com/kimifuto2/e33chat-K>** 下。`mc26.3` / `mc26.2` 是 **26.x 移植线**（Mojang 年份版本号），构建链与 1.21.11 差异很大（Java 25 / Gradle 9.8+ / Loom 1.19.3 / 不再混淆），详见对应分支 README 的「26.x 移植说明」；**本分支（`main`）只针对 1.21.11**。
 
@@ -260,8 +260,8 @@ java.lang.IllegalStateException: Cannot register channel. Too many channel regis
 
 | 文件 | 大小 |
 |---|---|
-| `build/libs/e33chat-Fabric-1.21.11-3.2.0.jar` | 708,153 B |
-| `build/libs/e33chat-Fabric-1.21.11-3.2.0-sources.jar` | 498,194 B |
+| `build/libs/e33chat-Fabric-1.21.11-3.2.0.jar` | 709,278 B |
+| `build/libs/e33chat-Fabric-1.21.11-3.2.0-sources.jar` | 499,195 B |
 
 ---
 

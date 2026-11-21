@@ -332,8 +332,24 @@ searchField.setTextShadow(false);
         int[] actions = owner
             ? new int[]{ACT_ADD, ACT_DISBAND_OR_LEAVE, ACT_DONE}
             : new int[]{ACT_DISBAND_OR_LEAVE, ACT_DONE};
-        int total = BOTTOM_GAP * (widths.length - 1);
+        int gaps = BOTTOM_GAP * (widths.length - 1);
+        int total = gaps;
         for (int w : widths) total += w;
+        // 高 GUI Scale 下卡片会缩到比固定按钮总宽更小，按可用宽度等比收缩，避免越出圆角边框。
+        int available = Math.max(80, cardW - 16);
+        if (total > available) {
+            int content = Math.max(40, available - gaps);
+            int baseSum = 0;
+            for (int w : widths) baseSum += w;
+            int used = 0;
+            for (int i = 0; i < widths.length; i++) {
+                widths[i] = Math.max(28, content * widths[i] / Math.max(1, baseSum));
+                used += widths[i];
+            }
+            widths[widths.length - 1] = Math.max(28, widths[widths.length - 1] + content - used);
+            total = gaps;
+            for (int w : widths) total += w;
+        }
         int x = cardX + (cardW - total) / 2;
         for (int i = 0; i < widths.length; i++) {
             footerBtns.add(new int[]{x, btnY, widths[i], BTN_H, actions[i]});

@@ -301,8 +301,13 @@ searchField.setTextShadow(false);
         return cardX + 12;
     }
 
+    /** 高 GUI Scale 下卡片会缩窄：底部按钮宽度随卡片可用宽度收缩。 */
+    private int footerBtnW() {
+        return Math.max(44, Math.min(BTN_W, (cardW - 24 - 8) / 2));
+    }
+
     private int doneX() {
-        return cardX + cardW - 12 - BTN_W;
+        return cardX + cardW - 12 - footerBtnW();
     }
 
     // ===== 绘制 =====
@@ -377,11 +382,11 @@ searchField.setTextShadow(false);
         int cancelX = cancelX();
         int doneX = doneX();
         drawFooterLine(g, btnY);
-        hoverCancel = hit(mouseX, mouseY, cancelX, btnY, BTN_W, BTN_H);
-        hoverDone = hit(mouseX, mouseY, doneX, btnY, BTN_W, BTN_H);
-        GroupUi.button(g, tr, cancelX, btnY, BTN_W, BTN_H,
+        hoverCancel = hit(mouseX, mouseY, cancelX, btnY, footerBtnW(), BTN_H);
+        hoverDone = hit(mouseX, mouseY, doneX, btnY, footerBtnW(), BTN_H);
+        GroupUi.button(g, tr, cancelX, btnY, footerBtnW(), BTN_H,
             Text.translatable("e33chat.group.cancel"), hoverCancel, false, false, true);
-        GroupUi.button(g, tr, doneX, btnY, BTN_W, BTN_H,
+        GroupUi.button(g, tr, doneX, btnY, footerBtnW(), BTN_H,
             Text.translatable("e33chat.group.done"), hoverDone, true, false, canFinish());
     }
 
@@ -393,8 +398,8 @@ searchField.setTextShadow(false);
         double mx = click.x();
         double my = click.y();
         if (click.button() == 0) {
-            if (hit(mx, my, cancelX(), btnY, BTN_W, BTN_H)) { close(); return true; }
-            if (hit(mx, my, doneX(), btnY, BTN_W, BTN_H)) { finish(); return true; }
+            if (hit(mx, my, cancelX(), btnY, footerBtnW(), BTN_H)) { close(); return true; }
+            if (hit(mx, my, doneX(), btnY, footerBtnW(), BTN_H)) { finish(); return true; }
             if (hit(mx, my, searchBtnX, searchY, SEARCH_BTN_W, FIELD_H)) {
                 // 「搜索」按钮：把输入框内容应用到列表（按钮不抢输入框的焦点，方便继续改词再搜）
                 applySearch();
