@@ -8,7 +8,6 @@ import com.niuqu.chatbubble.store.ChatMessageStore;
 import com.niuqu.chatbubble.config.ServerConfigScreen;
 import com.niuqu.chatbubble.config.ConfigManager;
 import com.niuqu.chatbubble.image.ImageLoader;
-import com.niuqu.chatbubble.mixin.ClientCommonNetworkHandlerAccessor;
 import com.niuqu.chatbubble.network.ChatMetaPayload;
 import com.niuqu.chatbubble.network.ConfigSyncPayload;
 import com.niuqu.chatbubble.network.ConfigSyncV2Payload;
@@ -25,9 +24,6 @@ import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.fabricmc.fabric.api.resource.ResourceManagerHelper;
 import net.fabricmc.fabric.api.resource.SimpleSynchronousResourceReloadListener;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientCommonPacketListenerImpl;
-import net.minecraft.client.multiplayer.ClientConfigurationPacketListenerImpl;
-import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.server.packs.PackType;
 import net.minecraft.resources.Identifier;
@@ -53,8 +49,6 @@ public class ChatBubbleClientSetup implements ClientModInitializer {
 
     /** 开关文件名：任何情况下都不声明自定义通道。 */
     private static final String NO_CUSTOM_CHANNELS_FLAG = "no-custom-channels.flag";
-    /** 记住「服务端也装了 E33Chat」的服务器地址；只对它们声明通道。自动维护，玩家无需手改。 */
-    private static final String E33_SERVERS_FILE = "e33chat-servers.txt";
 
     // ── 自定义载荷通道的「按连接」注册状态 ────────────────────────────────────
     // 旧实现用一个进程级一次性闩锁（注册过就永不再注销），单机/LAN 注册过的接收器会残留到
@@ -67,7 +61,6 @@ public class ChatBubbleClientSetup implements ClientModInitializer {
     private static volatile boolean connectionPending;
     /** 已经成功 JOIN 过（真的进过世界/服务器），用于识别「退世界没收到 DISCONNECT」的兜底。 */
     private static volatile boolean playSessionSeen;
-    private static java.util.Set<String> rememberedServers;
 
     // ── 「服务端是否也装了本模组」的探测状态 ──────────────────────────────────
     // JOIN 时用 ClientPlayNetworking.canSend(QuoteSyncPayload.ID) 判定，连接边界重置。
@@ -168,205 +161,26 @@ public class ChatBubbleClientSetup implements ClientModInitializer {
     }
 
     /**
-     * 从网络处理器上直接读目标服务器地址 —— **配置阶段与游戏阶段共用的唯一取地址入口**。
+     * 配置阶段的通道生命周期：INIT 与 START 共用（幂等）。先无条件注销上一次连接的残留，
+     * 再为本连接注册 E33Chat 的全部联动接收器。
      *
-     * <p>为什么不能只靠 {@code client.getCurrentServerEntry()}：1.21.11 里它的字节码是
-     * {@code Nullables.map(getNetworkHandler(), h -> h.getServerInfo())}，而
-     * {@code getNetworkHandler()} 只在 PLAY 阶段才有值。自定义载荷通道的声明发生在
-     * **配置阶段**，那一刻它恒为 null —— 所以按地址的白名单从未真正生效过（每次都退化成
-     * 「地址未知 → 不注册」或更糟的「地址未知 → 放行」）。{@code serverInfo} 是
-     * {@code ClientCommonPacketListenerImpl} 的 protected final 字段，在构造函数里由
-     * {@code ClientConnectionState.serverInfo()} 赋值，配置阶段就已经有值；同一实例随后被
-     * 传入 PLAY 阶段的 {@code ClientConnectionState}（见
-     * {@code ClientConfigurationPacketListenerImpl.onReady}），因此两个阶段读到的地址完全一致。
-     *
-     * @param handler 配置阶段的 {@code ClientConfigurationPacketListenerImpl} 或 PLAY 阶段的
-     *                {@code ClientPlayNetworkHandler}，null 表示没有连接
-     * @return 小写去空白的地址；拿不到（单机/未连接/accessor 未生效）返回 null
+     * <p>不再按服务器地址做白名单门控：E33Chat 只有 14 条通道，白名单最多只能撤掉这 14 条，
+     * 管不了其它模组，无法保证 Paper 的 127 条总上限；真正裁总量的是通道节食
+     * （{@code ChannelRegistrationDietMixin}）。这里始终注册，首次进服即可用联动；
+     * 只有硬关文件 {@code no-custom-channels.flag} 能阻止声明。
      */
-    private static String serverAddressFromHandler(ClientCommonPacketListenerImpl handler) {
-        if (handler == null) return null;
-        try {
-            ServerData info = ((ClientCommonNetworkHandlerAccessor) handler).e33chat$getServerInfo();
-            if (info == null) return null;
-            String a = info.ip;
-            return (a == null || a.isBlank()) ? null : a.trim().toLowerCase(java.util.Locale.ROOT);
-        } catch (Throwable t) {
-            // 安全默认：取不到就当「未知」，调用方一律按「不注册」处理，绝不放宽成放行
-            ChatMessageStore.debugLog("[e33chat] server address lookup failed | " + t);
-            return null;
-        }
-    }
-
-    /** 当前连接的目标服务器地址；单机/局域网（集成服务器）返回 null。 */
-    private static String currentServerAddress(Minecraft client) {
-        try {
-            if (client == null) return null;
-            // PLAY 阶段：先读网络处理器上的 serverInfo（与配置阶段同一个字段、同一个值），
-            // 这样「JOIN 时记住的地址」和「配置阶段比对的地址」一定是同一个字符串。
-            String fromHandler = serverAddressFromHandler(client.getConnection());
-            if (fromHandler != null) return fromHandler;
-            if (client.getCurrentServer() == null) return null;
-            String a = client.getCurrentServer().ip;
-            return (a == null || a.isBlank()) ? null : a.trim().toLowerCase(java.util.Locale.ROOT);
-        } catch (Throwable t) {
-            return null;
-        }
-    }
-
-    /**
-     * 配置阶段的「本连接要不要声明自定义通道」决定。INIT 与 START 共用（幂等）：先无条件注销
-     * 上一次连接的残留，再按 {@code 集成服务器 / 本地网段 / 白名单} 决定是否重新注册。
-     *
-     * <p>**安全默认**：地址拿不到、或拿到了但既不是本地也不在白名单里 → 什么都不注册。
-     * 绝不能因为 {@code addr == null} 就退化成「放行」。
-     */
-    private static void decideConfigurationChannels(ClientConfigurationPacketListenerImpl handler,
-                                                    Minecraft client,
-                                                    String phase) {
+    private static void decideConfigurationChannels(Minecraft client, String phase) {
         try {
             unregisterCustomChannels("configuration " + phase);
-            // 集成服务器（单机 / 自己是局域网主机）：用 client.getSingleplayerServer() 判定（不看地址），
-            // 这类目标一定是同一个 JVM 里的服务端，声明通道零风险。注意 START 一定晚于
-            // SERVER_STARTING，所以这里必须重新登记（刚被上面的注销清掉了）。
-            boolean integrated = client.getSingleplayerServer() != null;
-            // 远程连接的地址**只能**从配置阶段自己的网络处理器上取：getCurrentServerEntry()
-            // 由 player 派生，此刻恒为 null（这正是白名单长期失效的根因）。
-            String addr = serverAddressFromHandler(handler);
-            if (addr == null) addr = currentServerAddress(client);   // 兜底（正常不会命中）
-            // 局域网/私有网段 = 玩家自己的房间：等同单机待遇，配置阶段就注册，
-            // 不再依赖白名单（否则别人的局域网房间要「第二次进房」才有 interop）。
-            boolean local = addr != null && isLocalAddress(addr);
-            boolean remembered = addr != null && rememberedServers().contains(addr);
-            boolean allowed = integrated || local || remembered;
-            if (allowed) registerCustomChannels();
+            boolean off = flagFileExists(NO_CUSTOM_CHANNELS_FLAG);
+            if (!off) registerCustomChannels();
+            boolean integrated = client != null && client.getSingleplayerServer() != null;
             com.mojang.logging.LogUtils.getLogger().info(
-                "[e33chat] custom payload channels | phase={} | integrated={} | local={} | remote={} | addr='{}' | channels={}",
-                phase,
-                integrated ? "yes" : "no",
-                local ? "on" : "off",
-                remembered ? "whitelist" : "not-whitelisted",
-                addr,
-                channelsActive() ? "on" : "off");
+                "[e33chat] custom payload channels | phase={} | integrated={} | channels={} | forceOff={}",
+                phase, integrated ? "yes" : "no", channelsActive() ? "on" : "off", off ? "yes" : "no");
         } catch (Throwable t) {
-            // 绝不影响连接：注册失败最多是联动不可用
             ChatMessageStore.debugLog("[e33chat] channel decision at configuration " + phase + " failed | " + t);
         }
-    }
-
-    /**
-     * 从「服务器地址」里取出主机部分：{@code host:port} / {@code [::1]:port} / 裸 IPv6 都能处理。
-     * 解析失败返回空串（调用方按「非本地」处理，绝不放宽判定）。
-     */
-    private static String hostOf(String address) {
-        if (address == null) return "";
-        String a = address.trim().toLowerCase(java.util.Locale.ROOT);
-        if (a.isEmpty()) return "";
-        if (a.startsWith("[")) {                       // [::1]:25565
-            int end = a.indexOf(']');
-            return end > 0 ? a.substring(0, end + 1) : a;
-        }
-        int first = a.indexOf(':');
-        int last = a.lastIndexOf(':');
-        // 恰好一个冒号 = host:port；零个或多个 = 主机名/裸 IPv6
-        return (first > 0 && first == last) ? a.substring(0, first) : a;
-    }
-
-    /**
-     * 「本地」地址判定：单机 / 局域网 / 私有网段。这类目标要么就是本机，要么在同一个
-     * 内网里（玩家自己开的房间），对它们声明自定义通道既显然安全又必须**首次进房即生效**
-     * （否则要「第二次进服」才有 interop）。
-     *
-     * <p>覆盖：{@code 127.0.0.0/8}（含 127.0.0.1）、{@code localhost}、{@code ::1}、
-     * {@code 10.0.0.0/8}、{@code 172.16.0.0/12}、{@code 192.168.0.0/16}、
-     * {@code *.local}（mDNS）、{@code fe80::/10}（IPv6 链路本地）。
-     * 其余一律当远程（继续走白名单 + JOIN 自愈），不做任何放宽。
-     */
-    static boolean isLocalAddress(String address) {
-        String host = hostOf(address);
-        if (host.isEmpty()) return false;
-        if (host.startsWith("[") && host.endsWith("]"))
-            host = host.substring(1, host.length() - 1);
-        if (host.isEmpty()) return false;
-        if (host.equals("localhost") || host.endsWith(".localhost")) return true;
-        if (host.equals("::1") || host.equals("0:0:0:0:0:0:0:1")) return true;
-        if (host.endsWith(".local")) return true;
-        // IPv6 字面量才有冒号：fe80::/10 = 首段 fe80..febf
-        if (host.indexOf(':') >= 0 && host.length() >= 3 && host.startsWith("fe")) {
-            char c = host.charAt(2);
-            if (c == '8' || c == '9' || c == 'a' || c == 'b') return true;
-        }
-        String[] p = host.split("\\.", -1);
-        if (p.length != 4) return false;               // 不是点分 IPv4（主机名）→ 远程
-        int[] o = new int[4];
-        for (int i = 0; i < 4; i++) {
-            try {
-                o[i] = Integer.parseInt(p[i]);
-            } catch (NumberFormatException e) {
-                return false;
-            }
-            if (o[i] < 0 || o[i] > 255) return false;
-        }
-        if (o[0] == 127) return true;                  // 环回
-        if (o[0] == 10) return true;                   // 10.0.0.0/8
-        if (o[0] == 192 && o[1] == 168) return true;   // 192.168.0.0/16
-        if (o[0] == 172 && o[1] >= 16 && o[1] <= 31) return true;   // 172.16.0.0/12
-        return false;
-    }
-
-    private static Path e33ServersPath() {
-        Minecraft mc = Minecraft.getInstance();
-        if (mc == null || mc.gameDirectory == null) return null;
-        return mc.gameDirectory.toPath().resolve("config/e33chat").resolve(E33_SERVERS_FILE);
-    }
-
-    /** 已记住的服务器列表（自动维护）。 */
-    private static synchronized java.util.Set<String> rememberedServers() {
-        if (rememberedServers != null) return rememberedServers;
-        java.util.Set<String> out = new java.util.LinkedHashSet<>();
-        try {
-            Path p = e33ServersPath();
-            if (p != null && Files.exists(p)) {
-                for (String line : Files.readAllLines(p, java.nio.charset.StandardCharsets.UTF_8)) {
-                    String s = line.trim().toLowerCase(java.util.Locale.ROOT);
-                    if (!s.isEmpty() && !s.startsWith("#")) out.add(s);
-                }
-            }
-        } catch (Throwable ignored) {
-        }
-        rememberedServers = out;
-        return out;
-    }
-
-    private static synchronized void rememberServer(String addr) {
-        try {
-            java.util.Set<String> set = rememberedServers();
-            if (!set.add(addr)) return;
-            writeServersFile();
-        } catch (Throwable ignored) {
-        }
-    }
-
-    /** 服务器已不再装 E33Chat 时把它从白名单移除（自我修复）。返回是否真的移除了。 */
-    private static synchronized boolean forgetServer(String addr) {
-        try {
-            java.util.Set<String> set = rememberedServers();
-            if (!set.remove(addr)) return false;
-            writeServersFile();
-            return true;
-        } catch (Throwable t) {
-            return false;
-        }
-    }
-
-    private static void writeServersFile() throws java.io.IOException {
-        Path p = e33ServersPath();
-        if (p == null) return;
-        Files.createDirectories(p.getParent());
-        String body = "# servers that also run E33Chat: interop channels are announced only to these.\n"
-            + "# maintained automatically (added on detection, removed when the server no longer has E33Chat)\n"
-            + String.join("\n", rememberedServers()) + "\n";
-        Files.write(p, body.getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
     /** config/e33chat/<name> 是否存在（诊断/兼容开关，见 {@link #registerCustomChannels()}）。 */
@@ -423,10 +237,10 @@ public class ChatBubbleClientSetup implements ClientModInitializer {
      * {@code c:register}；对 Paper/vanilla 是 PLAY 阶段刚拿到 GameJoin 时发一条
      * {@code minecraft:register}。Paper 这类严格校验自定义载荷的服务端会直接以
      * "Invalid custom payload" 踢人。客户端在配置阶段无法得知服务端装了什么模组，因此
-     * 默认只在**集成服务器**（单机 / 自己是局域网主机）启动时注册，以及连**局域网/私有
-     * 网段地址**（见 {@link #isLocalAddress(String)}）时在配置阶段直接注册；连公网远程
-     * 服务器要启用联动时，按服务器地址白名单（自动维护）放行。
-     *
+     * "Invalid custom payload" 踢人。这里不再按服务器地址做白名单门控：E33Chat 自己的
+     * 14 条通道管不了其它模组，也保证不了 Paper 的 127 条总上限；总量交给通道节食
+     * （{@code ChannelRegistrationDietMixin}）。通道在每个连接边界统一注册/注销，
+     * 首次进服即可用联动。
      * <p><b>幂等</b>：本次连接已经注册过就直接返回；注册失败会回滚（把已登记的 id 全部注销），
      * 绝不让半套接收器留下来。
      */
@@ -661,9 +475,9 @@ public class ChatBubbleClientSetup implements ClientModInitializer {
         // 自定义载荷通道 = 服务端联动功能的前提，但 Fabric 会把「客户端能收哪些通道」的声明
         // 发给服务端（Fabric 服：配置阶段收到 c:register 后回一份 PLAY 相位的 c:register；
         // Paper/vanilla：PLAY 阶段刚拿到 GameJoin 时发 minecraft:register）。Paper 这类严格
-        // 校验的服务端会直接以 "Invalid custom payload" 踢人，而客户端在配置阶段无法得知
-        // 服务端装了什么模组，所以只在「有用且安全」的目标上声明：集成服务器（单机 / 自己是
-        // 局域网主机）以及白名单里的远程服务器。
+        // 校验的服务端会直接以 "Invalid custom payload" 踢人。E33Chat 自己的 14 条通道不再按
+        // 服务器地址做白名单门控：白名单无法控制其它模组的通道，也保证不了 Paper 的 127 条
+        // 总上限；总量由通道节食（ChannelRegistrationDietMixin）负责。
         //   config/e33chat/no-custom-channels.flag -> 任何情况下都不声明（硬关）
         //
         // 关键：声明集合是**进程级全局的**（ClientPlayNetworking.getGlobalReceivers()），所以
@@ -678,8 +492,8 @@ public class ChatBubbleClientSetup implements ClientModInitializer {
                 "[e33chat] custom payload channels: OFF (no-custom-channels.flag)");
         } else {
             // 进入配置阶段的第一时刻（配置网络处理器刚构造完，**早于任何配置包**）：远程连接先把
-            // 上一次连接残留的接收器清掉，并立刻按白名单做决定。这是「连 Paper 时不存在任何我们
-            // 的接收器」的第一道保险 —— 它不依赖服务端是否发包，因此比 START 更早、更确定。
+            // 上一次连接残留的接收器清掉，并立刻注册本次连接的接收器。它不依赖服务端是否发包，
+            // 因此比 START 更早、更确定。
             // 单机/LAN 必须放过：SERVER_STARTING 的注册早于这里（集成服务器先启动再连接），
             // 清了会把单机联动自己关掉（config START 会再补回来，但没必要先砸一次）。
             net.fabricmc.fabric.api.client.networking.v1.ClientConfigurationConnectionEvents.INIT
@@ -694,7 +508,7 @@ public class ChatBubbleClientSetup implements ClientModInitializer {
                         } catch (Throwable ignored) {
                         }
                         if (client.getSingleplayerServer() == null) {
-                            decideConfigurationChannels(handler, client, "init");
+                            decideConfigurationChannels(client, "init");
                         }
                     } catch (Throwable t) {
                         ChatMessageStore.debugLog("[e33chat] channel cleanup at configuration init failed | " + t);
@@ -713,15 +527,15 @@ public class ChatBubbleClientSetup implements ClientModInitializer {
             // sendInitialChannelRegistrationPacket() 发出 —— 服务端先发 version 再发 register
             // （CommonPacketsImpl.init 里两个 Task 的注册顺序），所以 START 的决定一定早于申报。
             net.fabricmc.fabric.api.client.networking.v1.ClientConfigurationConnectionEvents.START
-                .register((handler, client) -> decideConfigurationChannels(handler, client, "start"));
+                .register((handler, client) -> decideConfigurationChannels(client, "start"));
             com.mojang.logging.LogUtils.getLogger().info(
-                "[e33chat] custom payload channels | single player/LAN=on | "
-                + "remote=only for remembered E33Chat servers | per-connection registration");
+                "[e33chat] custom payload channels | always registered | per-connection lifecycle");
+
         }
 
         // 服务器也装了 E33Chat 时会为我们的 C2S 通道注册接收器，canSend() 因此为 true。
-        // 远程服务器默认不声明通道（严格服务端会拒），这里**自动**记住这样的服务器，
-        // 玩家不需要手动建任何文件；下次连接即带联动。首次连接因协议时序无法联动。
+        // 首次进服就能拿到该探测结果；通道本身在配置阶段已经注册，不再依赖白名单记忆。
+
         net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.JOIN.register(
             (handler, sender, client) -> {
                 // 连接边界：探测结果与「私聊提示已经出过」的去重表都重新开始
@@ -735,70 +549,14 @@ public class ChatBubbleClientSetup implements ClientModInitializer {
                 // 所以这里（以及 START 里的决定）一定早于通道声明被组装。
                 connectionPending = false;
                 playSessionSeen = true;
-                // 硬保证（第一道兜底）：到了 PLAY 就能拿到真实地址了。如果这次其实是**未白名单的
-                // 远程服务器**（说明配置阶段那个「是不是集成服务器」的判断被极端情况骗了），立刻
-                // 把残留注销——Fabric 是「先发 JOIN、再组装 minecraft:register」，所以这里还来得及。
+                // 探测服务端是否也装了 E33Chat（canSend = 服务端为 QuoteSyncPayload 注册了接收器）。
+                // 该探测与通道是否声明无关：即使 forceOff 也要拿到结果，否则私聊提示永远不出现。
                 try {
-                    String joinAddr = currentServerAddress(client);
-                    // 集成服务器（单机 / 自己是局域网主机）永远不按地址注销：它的 serverInfo
-                    // 不是「远程服务器地址」语义，拿去比对远程白名单只会误杀单机联动。
-                    boolean joinIntegrated = client.getSingleplayerServer() != null;
-                    if (!joinIntegrated
-                        && joinAddr != null
-                        && !isLocalAddress(joinAddr)
-                        && !rememberedServers().contains(joinAddr)
-                        && channelsActive()) {
-                        unregisterCustomChannels("play join (remote server not whitelisted)");
-                    }
-                } catch (Throwable t) {
-                    ChatMessageStore.debugLog("[e33chat] channel cleanup at join failed | " + t);
-                }
-                try {
-                    String addr = currentServerAddress(client);
-                    // 「服务端是否也装了本模组」：集成服务器（单机 / 自己是局域网主机）跑的
-                    // 就是这个 jar 的服务端入口，一定装了；远程靠 canSend（服务端也装了本模组
-                    // 才会为 QuoteSyncPayload 注册接收器）。该探测与「是否声明通道」
-                    // （forceOff / 白名单）无关，所以必须放在 forceOff 早退之前 —— 否则开着
-                    // forceOff 的玩家永远拿不到结果，私聊提示也就永远不出现。
                     boolean integrated = client.getSingleplayerServer() != null;
                     boolean serverHasE33 = integrated
                         || net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.canSend(
                             com.niuqu.chatbubble.network.QuoteSyncPayload.ID);
                     serverModState = serverHasE33 ? ServerModState.PRESENT : ServerModState.ABSENT;
-                    if (integrated) return;   // 单机 / 自己是局域网主机：集成服务器那条路径
-                    // 远程但地址拿不到（理论上不该发生：PLAY 阶段 handler 必有 serverInfo）：
-                    // 无法比对白名单 → 既不记住也不遗忘，保持现状（安全默认，不写 "null" 进文件）。
-                    if (addr == null) {
-                        ChatMessageStore.debugLog("[e33chat] join: remote address unknown, whitelist untouched");
-                        return;
-                    }
-                    if (forceOff) return;
-                    // 局域网/私有网段在配置阶段就已注册（见 START 钩子），这里只需复查
-                    // 「服务器是否真的装了 E33Chat」并维护白名单，不再是首次生效的分界点。
-                    boolean local = isLocalAddress(addr);
-                    // canSend 反映的是「服务器是否声明支持该通道」，因此即使本次没声明也能
-                    // 用它复查服务器当前是否真的还装着 E33Chat —— 白名单靠这个自我修复。
-                    if (!serverHasE33) {
-                        // 服务器已移除 E33Chat：忘掉它，之后连它不再声明通道（避免被严格服务端踢）
-                        if (forgetServer(addr)) {
-                            com.mojang.logging.LogUtils.getLogger().info(
-                                "[e33chat] server no longer runs E33Chat -> forgot '{}'", addr);
-                        }
-                        return;
-                    }
-                    if (rememberedServers().contains(addr)) return;
-                    rememberServer(addr);
-                    com.mojang.logging.LogUtils.getLogger().info(
-                        local
-                            ? "[e33chat] server runs E33Chat -> remembered '{}' (local network: interop already on)"
-                            : "[e33chat] server runs E33Chat -> remembered '{}' (interop engages from the next join)",
-                        addr);
-                    client.execute(() -> {
-                        if (client.player != null) {
-                            client.player.sendSystemMessage(
-                                net.minecraft.network.chat.Component.translatable("e33chat.channels.auto_enabled"));
-                        }
-                    });
                 } catch (Throwable ignored) {
                     // best effort: never disturb the connection
                 }

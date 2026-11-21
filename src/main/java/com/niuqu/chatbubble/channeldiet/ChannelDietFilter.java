@@ -18,7 +18,7 @@ import java.util.Set;
  * 输入「命名空间 → 通道数」的计数表，输出「保留哪些命名空间、因配置剔除了哪些、
  * 因超限又剔除了哪些」。mixin 只需要按计划过滤 {@code Identifier} 集合。
  *
- * <p><b>3.0.3 起没有「三态模式」了</b>：是否裁剪只看配置里的唯一总开关
+ * <p><b>3.0.3 起没有「三态模式」了</b>：是否手动裁剪看配置里的总开关；Paper 超限时还有自动兜底
  * {@code ChatBubbleConfig#channelDietEnabled}（见 {@code ChannelRegistrationDietMixin}）。
  * 这里只剩两个历史取值常量，仅用于给 {@code ChannelDietStats.Snapshot#mode} 填值（不参与判定）。
  *
@@ -30,9 +30,9 @@ import java.util.Set;
 public final class ChannelDietFilter {
     private ChannelDietFilter() {}
 
-    /** 统计快照里的「未裁剪」取值（总开关关闭 → 只统计不裁剪）。 */
+    /** 统计快照里的「未裁剪」取值（手动开关关闭且未触发 Paper 自动兜底 → 只统计不裁剪）。 */
     public static final String MODE_OFF = "off";
-    /** 统计快照里的「裁剪」取值（总开关开启 → 按禁用命名空间 + 上限裁剪）。 */
+    /** 统计快照里的「裁剪」取值（手动开关开启或 Paper 超限自动兜底 → 按禁用命名空间 / 上限裁剪）。 */
     public static final String MODE_ACTIVE = "active";
 
     /** Paper 的通道上限（严格 {@code < 128}，即最多 127 条）。 */

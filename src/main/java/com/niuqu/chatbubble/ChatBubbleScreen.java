@@ -135,6 +135,9 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
      *  输入框「看起来的那块矩形」= 本体上下各外扩这么多。 */
     private static final int INPUT_BOX_OUTSET = 2;
     private static final int ICON_S = 14;
+    private static final int BAR_ICON_S = 11;
+    private static final int TITLE_BTN_W = 19;
+    private static final int TITLE_BTN_H = 15;
     /** 输入框宽度的下限。窄窗口（或侧边栏展开后窗口又变窄）时
      *  {@code sendX - ICON_S - 8 - inputX} 会算出 0/负值，而
      *  {@code EditBox.getInnerWidth()} 直接把它当可视宽度交给
@@ -1946,8 +1949,8 @@ if (this.getFocused() != null && this.getFocused().keyPressed(input))
                 }
                 return true;
             }
-            if (mouseX >= panelX + panelW - 18 && mouseX <= panelX + panelW - 6
-                && mouseY >= titleY + 6 && mouseY <= titleY + 18) { onClose(); return true; }
+            if (mouseX >= titleCloseOuterX() && mouseX <= titleCloseOuterX() + ICON_S + 1
+                && mouseY >= titleCloseOuterY() && mouseY <= titleCloseOuterY() + ICON_S + 1) { onClose(); return true; }
             // 群聊：关闭键左侧的「设置」按钮 → 群聊设置在聊天面板内以**模态层**打开
             // （不再 minecraft.setScreen：那样会把整个聊天面板替换掉）
             if (isMouseOverGroupSettings(mouseX, mouseY)) {
@@ -2772,51 +2775,65 @@ boolean selDrag = textSelection.isDragActive();
         String title = getDisplayTitle();
         int titleW = font.width(title);
         int titleX = UiLayout.centerX(panelX, panelW, titleW);
-        int titleTextY = ty + (TITLE_H - font.lineHeight) / 2;
+        int titleTextY = ty + 4;
         g.drawText(font, title, titleX, titleTextY, ChatBubbleTheme.alphaBlend(c().textPrimary(), c255), false);
 
-        int closeX = panelX + panelW - 18;
-        int closeY = ty + 6;
-        // 群聊视图：关闭键**左边**单独一颗「设置」按钮（齿轮）。群设置界面
-        // （改群名/加人/踢人/解散）的唯一入口，位置贴着关闭键，与需求「顶部靠右」一致。
-        // 第 3 轮微调：齿轮/关闭都从「12x12 方角贴图（CLOSE_BG/CLOSE_HOVER）」改成
-        // **圆角按钮**（描边 6 / 内层 5 + 悬停 popupHover），与底栏 drawIconButton 同一套弧度；
-        // 矩形/命中区域完全不变（仍是 12x12），关闭键点击行为不变。
-        int gearShift = isGroupConversation() ? 18 : 0;
+        int closeOuterX = titleCloseOuterX();
+        int closeOuterY = titleCloseOuterY();
         if (isGroupConversation()) {
-            int gx = closeX - 16;
-            int gy = closeY;
-            boolean hoverGear = mouseX >= gx && mouseX <= gx + 12 && mouseY >= gy && mouseY <= gy + 12;
-            drawTitleIconButton(g, gx, gy, 12, panelAlpha, hoverGear);
-            drawTextureIconAlpha(g, iconTex("settings"), gx + 1, gy + 1, 10, getAnimProgress());
+            int gearOuterX = titleGearOuterX();
+            boolean hoverGear = mouseX >= gearOuterX && mouseX <= gearOuterX + ICON_S + 1
+                && mouseY >= closeOuterY && mouseY <= closeOuterY + ICON_S + 1;
+            drawIconButton(g, iconTex("settings"), gearOuterX + 1, closeOuterY + 1, ICON_S - 1,
+                getAnimProgress(), hoverGear);
         }
 
         String time = LocalTime.now().format(TIME_FMT);
-        int timeW = font.width(time);
-        g.drawText(font, time,
-            panelX + panelW - PAD - 20 - timeW - gearShift, ty + (TITLE_H - font.lineHeight) / 2, ChatBubbleTheme.alphaBlend(c().timeColor(), c255), false);
+        g.getMatrices().pushMatrix();
+        g.getMatrices().translate(panelX + panelW / 2f, ty + 14f);
+        g.getMatrices().scale(0.72f, 0.72f);
+        g.drawText(font, time, -font.width(time) / 2, 0,
+            ChatBubbleTheme.alphaBlend(c().timeColor(), c255), false);
+        g.getMatrices().popMatrix();
 
-        boolean hoverClose = mouseX >= closeX && mouseX <= closeX + 12 && mouseY >= closeY && mouseY <= closeY + 12;
-        drawTitleIconButton(g, closeX, closeY, 12, panelAlpha, hoverClose);
-        g.drawText(font, "✕", closeX + 6 - font.width("✕") / 2, closeY + 2, ChatBubbleTheme.alphaBlend(c().closeText(), c255), false);
+        boolean hoverClose = mouseX >= closeOuterX && mouseX <= closeOuterX + ICON_S + 1
+            && mouseY >= closeOuterY && mouseY <= closeOuterY + ICON_S + 1;
+        drawTitleIconButton(g, closeOuterX, closeOuterY, panelAlpha, hoverClose);
+        int closeCx = closeOuterX + (ICON_S + 1) / 2;
+        int closeCy = closeOuterY + (ICON_S + 1) / 2;
+        g.getMatrices().pushMatrix();
+        g.getMatrices().translate(closeCx + 0.5f, closeCy + 0.5f);
+        g.getMatrices().scale(1.5f, 1.5f);
+        g.drawText(font, "✕", -font.width("✕") / 2, -font.lineHeight / 2,
+            ChatBubbleTheme.alphaBlend(c().closeText(), c255), false);
+        g.getMatrices().popMatrix();
     }
 
     /** 标题栏小图标按钮（群视图的齿轮 / 右侧关闭键）的**圆角**底：
      *  外圈 1px 描边（textMuted，圆角 6）+ 内缩 1px 的 inputBg 填充（圆角 5）+
      *  悬停时叠一层 popupHover —— 与底栏 {@code drawIconButton}、免打扰按钮完全同构。
      *  尺寸取 12px（沿用原来方角贴图的 12x12 矩形，命中区域不变）。 */
-    private void drawTitleIconButton(UiCanvas g, int x, int y, int size, float alpha, boolean hover) {
+    private void drawTitleIconButton(UiCanvas g, int outerX, int outerY, float alpha, boolean hover) {
+        int outer = ICON_S + 1;
         int a255 = (int) (255 * alpha);
         if (a255 <= 2) return;
         int border = ChatBubbleTheme.alphaBlend(c().textMuted(), a255);
         int bg = ChatBubbleTheme.alphaBlend(c().inputBg(), a255);
-        RoundRectRenderer.fill(g, x, y, x + size, y + size, 6f, border);
-        RoundRectRenderer.fill(g, x + 1, y + 1, x + size - 1, y + size - 1, 5f, bg);
+        RoundRectRenderer.fill(g, outerX, outerY, outerX + outer, outerY + outer, 6f, border);
+        RoundRectRenderer.fill(g, outerX + 1, outerY + 1, outerX + outer - 1, outerY + outer - 1, 5f, bg);
         if (hover) {
-            RoundRectRenderer.fill(g, x, y, x + size, y + size, 6f,
+            RoundRectRenderer.fill(g, outerX + 1, outerY + 1, outerX + outer - 1, outerY + outer - 1, 5f,
                 ChatBubbleTheme.alphaBlend(c().popupHover(), a255));
         }
     }
+
+    private int titleCloseOuterX() { return panelX + panelW - 6 - (ICON_S + 1); }
+    private int titleCloseOuterY() { return titleY + (TITLE_H - (ICON_S + 1)) / 2; }
+    private int titleGearOuterX() { return titleCloseOuterX() - 4 - (ICON_S + 1); }
+
+    private int titleCloseX() { return panelX + panelW - 6 - TITLE_BTN_W; }
+    private int titleCloseY() { return titleY + (TITLE_H - TITLE_BTN_H) / 2; }
+    private int titleGearX() { return titleCloseX() - 4 - TITLE_BTN_W; }
 
     // ==== 群聊：标题栏设置按钮 / 侧边栏「+」按钮 ====
 
@@ -2836,9 +2853,9 @@ boolean selDrag = textSelection.isDragActive();
     /** 标题栏「设置」按钮命中矩形（与 renderTitleBar 里的绘制同源）。 */
     private boolean isMouseOverGroupSettings(double mx, double my) {
         if (!isGroupConversation()) return false;
-        int gx = panelX + panelW - 18 - 16;
-        int gy = titleY + 6;
-        return mx >= gx && mx <= gx + 12 && my >= gy && my <= gy + 12;
+        int gx = titleGearOuterX();
+        int gy = titleCloseOuterY();
+        return mx >= gx && mx <= gx + ICON_S + 1 && my >= gy && my <= gy + ICON_S + 1;
     }
 
     /** 侧边栏「+」按钮命中（坐标是侧边栏本地坐标，x 从 0 起）。 */
@@ -2874,7 +2891,7 @@ boolean selDrag = textSelection.isDragActive();
         RoundRectRenderer.fill(g, x, y, x + size, y + size, 6f, border);
         RoundRectRenderer.fill(g, x + 1, y + 1, x + size - 1, y + size - 1, 5f, bg);
         if (hover && usable) {
-            RoundRectRenderer.fill(g, x, y, x + size, y + size, 6f,
+            RoundRectRenderer.fill(g, x + 1, y + 1, x + size - 1, y + size - 1, 5f,
                 ChatBubbleTheme.alphaBlend(c().popupHover(), a255));
         }
         int cx = x + size / 2;
@@ -3115,7 +3132,7 @@ boolean selDrag = textSelection.isDragActive();
             int hoverColor = active
                 ? ChatBubbleTheme.alphaBlend(0xFFFFFFFF, (int) (0x44 * alpha))
                 : ChatBubbleTheme.alphaBlend(c().popupHover(), a255);
-            RoundRectRenderer.fill(g, bx, by, bx + bw, by + bh, 6f, hoverColor);
+            RoundRectRenderer.fill(g, bx + 1, by + 1, bx + bw - 1, by + bh - 1, 5f, hoverColor);
         }
         if (active) {
             drawTintedIcon(g, dndMaskTex(), x, y, size, ChatBubbleTheme.alphaBlend(0xFFFFFFFF, a255));
@@ -4690,9 +4707,10 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
         RoundRectRenderer.fill(g, bx, by, bx + bw, by + bh, 6f, border);
         RoundRectRenderer.fill(g, bx + 1, by + 1, bx + bw - 1, by + bh - 1, 5f, bg);
         if (hover)
-            RoundRectRenderer.fill(g, bx, by, bx + bw, by + bh, 6f,
+            RoundRectRenderer.fill(g, bx + 1, by + 1, bx + bw - 1, by + bh - 1, 5f,
                 ChatBubbleTheme.alphaBlend(c().popupHover(), a255));
-        drawTextureIconAlpha(g, tex, x, y, size, alpha);
+        int glyph = Math.min(BAR_ICON_S, size);
+        drawTextureIconAlpha(g, tex, x + (size - glyph) / 2, y + (size - glyph) / 2, glyph, alpha);
     }
 
 

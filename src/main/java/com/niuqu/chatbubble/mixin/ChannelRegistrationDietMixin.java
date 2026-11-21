@@ -35,7 +35,7 @@ import java.util.Set;
  *   <li><b>日志</b>：开关开着时打一行
  *       {@code [e33chat] channel diet | enabled=true | brand=.. | total=N | limit=120 | ...}；</li>
  *   <li><b>裁剪</b>：只看唯一总开关 {@code ChatBubbleConfig#channelDietEnabled}
- *       （3.0.3 起没有三态模式）。开关关闭 = **只统计不裁剪**，原样放行；
+ *       （3.0.3 起没有三态模式）。开关关闭 = 只在 Paper 且总数超限时自动兜底裁剪，其余情况原样放行；
  *       开关打开时仍只在「非集成服务器 + brand 已知且不含 fabric」时才执行
  *       （Fabric 服务端/单机一律不裁剪，保持与旧版一致的安全语义）。</li>
  * </ol>
@@ -86,7 +86,7 @@ public abstract class ChannelRegistrationDietMixin {
         ChatBubbleConfig cfg = ChatBubbleClientSetup.config();
         if (cfg == null) return channels;
 
-        // 唯一总开关：开 = 按设置页裁剪；关 = 只统计不裁剪（发送时原样放行）。
+        // 手动总开关：开 = 按设置页裁剪；关 = 只在 Paper 超限时自动兜底，其余原样放行。
         boolean dietEnabled = Boolean.TRUE.equals(cfg.channelDietEnabled());
         int limit = cfg.channelDietLimitResolved();
         List<String> disabled = cfg.channelDietDisabledResolved();
@@ -99,21 +99,32 @@ public abstract class ChannelRegistrationDietMixin {
             brand = handler != null ? handler.serverBrand() : null;
         }
 
-        // 1) 统计（开关关闭也记录：GUI 在只统计模式下同样需要看到真实数字）
+        // Paper 类服务端（非 Fabric、brand 已知）且总数已超限 → 即使手动开关关闭也自动裁剪。
+        // 不这么做的话，默认关闭的用户在 Paper 上照样会被 128 条上限踢掉；自动兜底只在
+        // “不裁剪必然被踢”的情况下生效，不改变正常服务器的行为。
+        boolean paperLike = !integrated && brand != null && !brand.isBlank()
+            && !brand.toLowerCase(Locale.ROOT).contains("fabric");
+        int rawTotal = 0;
+        if (channels != null) for (Identifier id : channels) if (id != null) rawTotal++;
+        int effectiveLimit = dietEnabled ? limit : ChannelDietFilter.LIMIT_MAX;
+        boolean autoTrim = paperLike && rawTotal > ChannelDietFilter.LIMIT_MAX;
+        boolean trim = dietEnabled || autoTrim;
+
+        // 1) 统计（不裁剪时也要记录：GUI 在只统计模式下同样需要看到真实数字）
         ChannelDietStats.Snapshot snap;
         try {
             snap = ChannelDietStats.record(channels,
-                dietEnabled ? ChannelDietFilter.MODE_ACTIVE : ChannelDietFilter.MODE_OFF,
-                brand, integrated, limit, disabled);
+                trim ? ChannelDietFilter.MODE_ACTIVE : ChannelDietFilter.MODE_OFF,
+                brand, integrated, effectiveLimit, disabled);
         } catch (Throwable t) {
             ChatMessageStore.debugLog(() -> "[e33chat] channel diet stats failed | " + t);
             return channels;
         }
         int total = snap.total();
-        int over = Math.max(0, total - limit);
+        int over = Math.max(0, total - effectiveLimit);
 
-        // 2) 总开关关闭 = 只统计不裁剪：通道声明原样发给服务端
-        if (!dietEnabled) return channels;
+        // 2) 手动开关关闭且未触发 Paper 自动兜底 = 只统计不裁剪：原样发送
+        if (!trim) return channels;
 
         // 3) 安全语义：集成服务器（单机/局域网主机）与 Fabric / brand 未知一律不裁剪。
         //    集成服务器不可能是 Paper；Fabric 服务端没有 Paper 的通道上限，且裁剪会让联动失效。
@@ -123,8 +134,8 @@ public abstract class ChannelRegistrationDietMixin {
         if (fabricLike) {
             String reason = integrated ? "integrated-server"
                 : (brand == null || brand.isBlank() ? "unknown-brand" : "fabric-brand");
-            log("[e33chat] channel diet | enabled=true | brand=" + brandOf(brand)
-                + " | total=" + total + " | limit=" + limit + " | over=" + over
+            log("[e33chat] channel diet | enabled=true | trigger=" + (dietEnabled ? "config" : "paper-auto") + " | brand=" + brandOf(brand)
+                + " | total=" + total + " | limit=" + effectiveLimit + " | over=" + over
                 + " | skipped=" + reason);
             return channels;
         }
@@ -133,7 +144,8 @@ public abstract class ChannelRegistrationDietMixin {
 
         // 4) 裁剪：先按禁用命名空间整族剔除，仍超限再按通道数从多到少继续剔除。
         Map<String, Integer> counts = snap.asMap();
-        ChannelDietFilter.Plan plan = ChannelDietFilter.plan(counts, limit, disabled);
+        List<String> effectiveDisabled = dietEnabled ? disabled : List.of();
+        ChannelDietFilter.Plan plan = ChannelDietFilter.plan(counts, effectiveLimit, effectiveDisabled);
         Set<String> keep = new HashSet<>(plan.kept());
         List<Identifier> kept = new ArrayList<>(channels.size());
         for (Identifier id : channels) {
@@ -164,9 +176,9 @@ public abstract class ChannelRegistrationDietMixin {
         if (!plan.droppedByConfig().isEmpty()) extra.append(" | disabled=").append(plan.droppedByConfig());
         if (!plan.droppedByLimit().isEmpty()) extra.append(" | autoTrim=").append(plan.droppedByLimit());
         if (truncated) extra.append(" | truncatedTo=").append(kept.size());
-        log("[e33chat] channel diet | enabled=true | brand=" + brandOf(brand)
-            + " | total=" + total + " | limit=" + limit + " | over=" + over
-            + " | declared=" + kept.size() + extra);
+        log("[e33chat] channel diet | enabled=true | trigger=" + (dietEnabled ? "config" : "paper-auto")
+            + " | brand=" + brandOf(brand) + " | total=" + total + " | limit=" + effectiveLimit
+            + " | over=" + over + " | declared=" + kept.size() + extra);
 
         // 没有可裁剪的通道（例如全部被保留）时直接放行原集合，避免多复制一次
         if (kept.size() == channels.size()) return channels;
