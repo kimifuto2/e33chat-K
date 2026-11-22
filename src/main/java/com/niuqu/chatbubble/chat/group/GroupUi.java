@@ -99,7 +99,7 @@ public final class GroupUi {
     /** 标题（居中）。 */
     public static void title(UiCanvas g, Font tr, Component text, int cx, int y, int color) {
         String s = text.getString();
-        g.drawText(tr, s, cx - tr.width(s) / 2, y, color, false);
+        g.drawText(tr, s, cx - tr.width(s) / 2, y, a(color), false);
     }
 
     /**

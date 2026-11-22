@@ -141,7 +141,7 @@ public abstract class GroupModal {
     protected final void drawEmptyHint(UiCanvas g, Component text, int y) {
         String s = text.getString();
         g.drawText(tr, s, cardX + (cardW - tr.width(s)) / 2, y,
-            ChatBubbleTheme.alphaBlend(GroupUi.colors().textMuted(), 0xFF), false);
+            GroupUi.a(GroupUi.colors().textMuted(), 0xFF), false);
     }
 
     /** 圆角填充的快捷入口（子类画细线/小条时用）。 */
