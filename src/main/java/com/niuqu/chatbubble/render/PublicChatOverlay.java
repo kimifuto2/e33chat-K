@@ -51,7 +51,7 @@ public final class PublicChatOverlay {
     /** 常驻条数（最近 N 条公屏）。 */
     private static final int MAX_MESSAGES = 3;
     /** 面板内最多显示的文字行数（单条长消息换行后受此限制，超出截断）。 */
-    private static final int MAX_ROWS = 6;
+    private static final int MAX_ROWS = 3;
     /** 面板宽度（GUI 像素），随窗口宽度收窄。 */
     private static final int PANEL_W = 220;
     private static final int MIN_PANEL_W = 96;
