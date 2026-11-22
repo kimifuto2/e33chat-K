@@ -1,5 +1,7 @@
 package com.niuqu.chatbubble.network;
 
+import com.niuqu.chatbubble.network.GroupWire;
+
 import com.niuqu.chatbubble.store.ChatMessageStore;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.network.codec.PacketCodec;
@@ -32,16 +34,24 @@ public record ConfigSyncV2Payload(boolean useTpa, List<String> chatTemplates,
         )
     );
 
+    public static final int MAX_LIST = 64;
+    public static final int MAX_ITEM = 512;
+
     static List<String> readList(PacketByteBuf buf) {
         int count = buf.readInt();
+        if (count < 0 || count > MAX_LIST) {
+            throw new IllegalArgumentException("bad template count: " + count);
+        }
         List<String> out = new ArrayList<>(count);
-        for (int i = 0; i < count; i++) out.add(buf.readString());
+        for (int i = 0; i < count; i++) out.add(GroupWire.readString(buf, MAX_ITEM));
         return out;
     }
 
     static void writeList(PacketByteBuf buf, List<String> list) {
-        buf.writeInt(list.size());
-        for (String s : list) buf.writeString(s);
+        List<String> src = list == null ? List.of() : list;
+        int n = Math.min(src.size(), MAX_LIST);
+        buf.writeInt(n);
+        for (int i = 0; i < n; i++) GroupWire.writeString(buf, src.get(i), MAX_ITEM);
     }
 
     @Override

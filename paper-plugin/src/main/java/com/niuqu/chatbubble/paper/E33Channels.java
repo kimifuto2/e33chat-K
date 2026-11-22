@@ -41,6 +41,7 @@ final class E33Channels {
     static final String GROUP_MESSAGE = "e33chat:group_message";
     static final String GROUP_INVITE = "e33chat:group_invite";
     static final String GROUP_INVITE_RESPOND = "e33chat:group_invite_respond";
+    static final String GROUP_TRANSFER = "e33chat:group_transfer";
     static final String GROUP_KICK = "e33chat:group_kick";
     static final String GROUP_LEAVE = "e33chat:group_leave";
     static final String GROUP_RENAME = "e33chat:group_rename";
@@ -77,7 +78,7 @@ final class E33Channels {
     static final List<String> INCOMING = List.of(
         QUOTE_SYNC,
         GROUP_CREATE, GROUP_MESSAGE, GROUP_INVITE, GROUP_INVITE_RESPOND,
-        GROUP_KICK, GROUP_LEAVE, GROUP_RENAME, GROUP_DISBAND,
+        GROUP_TRANSFER, GROUP_KICK, GROUP_LEAVE, GROUP_RENAME, GROUP_DISBAND,
         PLAYER_ACTION, IMAGE_MESSAGE);
 
     /** 需要 {@code registerOutgoingPluginChannel} 的全部通道（S2C）。 */

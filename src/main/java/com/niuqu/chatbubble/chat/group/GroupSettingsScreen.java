@@ -101,6 +101,10 @@ public class GroupSettingsScreen extends GroupModal {
     private boolean hoverEdit, hoverSearch;
     /** 每行「踢出」按钮命中矩形：[x, y, w, h, 过滤后成员下标]。 */
     private final List<int[]> kickRects = new ArrayList<>();
+    /** 每行「转让群主」按钮命中矩形：[x, y, w, h, 过滤后成员下标]。 */
+    private final List<int[]> transferRects = new ArrayList<>();
+    private UUID transferTarget;
+    private long transferConfirmAt;
     /** 底部按钮命中矩形：[x, y, w, h, action]。渲染与点击共用同一份算式。 */
     private final List<int[]> footerBtns = new ArrayList<>();
 
@@ -419,6 +423,8 @@ searchField.setTextShadow(false);
         // ---- 成员列表（按搜索词过滤后）----
         clampScroll();
         kickRects.clear();
+        transferRects.clear();
+        boolean owner = isOwner(group);
         List<GroupStore.Member> members = members();
         List<GroupStore.Member> shown = filteredMembers();
         UUID self = GroupStore.currentSelf();
@@ -439,19 +445,36 @@ searchField.setTextShadow(false);
             if (isSelf) label = label + Text.translatable("e33chat.group.settings.self_tag").getString();
             if (isCreator) label = label + Text.translatable("e33chat.group.settings.creator_tag").getString();
             int nameX = cardX + 32;
-            int kickW = 40;
+            int actionW = 40;
+            int transferW = owner && !isSelf && !isCreator ? 40 : 0;
+            int reserve = (owner ? actionW : 0) + (transferW > 0 ? transferW + 4 : 0) + 8;
             g.drawText(tr,
-                GroupUi.ellipsize(tr, label, cardX + cardW - 12 - kickW - 8 - nameX),
+                GroupUi.ellipsize(tr, label, cardX + cardW - 12 - reserve - nameX),
                 nameX, y + (ROW_H - tr.fontHeight) / 2 + 1, GroupUi.a(c.textPrimary()), false);
 
-            // 踢出：自己 / 创建者不可踢（服务端也会拒绝，这里只是不画按钮）
-            if (!isSelf && !isCreator) {
-                int kx = cardX + cardW - 12 - kickW;
+            // 转让群主：只有群主可见；需要再点一次确认。
+            if (owner && !isSelf && !isCreator) {
+                int tx = cardX + cardW - 12 - actionW - transferW - 4;
                 int ky = y + (ROW_H - 14) / 2;
-                boolean kh = hit(mouseX, mouseY, kx, ky, kickW, 14);
-                GroupUi.button(g, tr, kx, ky, kickW, 14,
+                boolean confirming = transferTarget != null && transferTarget.equals(m.uuid())
+                    && Util.getMeasuringTimeMs() - transferConfirmAt <= CONFIRM_MS;
+                boolean th = hit(mouseX, mouseY, tx, ky, transferW, 14);
+                GroupUi.button(g, tr, tx, ky, transferW, 14,
+                    Text.translatable(confirming
+                        ? "e33chat.group.settings.transfer_confirm"
+                        : "e33chat.group.settings.transfer"),
+                    th, false, true, true);
+                transferRects.add(new int[]{tx, ky, transferW, 14, i});
+            }
+
+            // 踢出：只有群主可见；自己 / 创建者不可踢（服务端也会拒绝）。
+            if (owner && !isSelf && !isCreator) {
+                int kx = cardX + cardW - 12 - actionW;
+                int ky = y + (ROW_H - 14) / 2;
+                boolean kh = hit(mouseX, mouseY, kx, ky, actionW, 14);
+                GroupUi.button(g, tr, kx, ky, actionW, 14,
                     Text.translatable("e33chat.group.settings.kick"), kh, false, true, true);
-                kickRects.add(new int[]{kx, ky, kickW, 14, i});
+                kickRects.add(new int[]{kx, ky, actionW, 14, i});
             }
             y += ROW_H + ROW_GAP;
         }
@@ -463,7 +486,6 @@ searchField.setTextShadow(false);
         }
 
         // ---- 底部：角色区分 + 等距居中（第 2 / 4 轮）----
-        boolean owner = isOwner(group);
         computeFooterButtons(owner);
         drawFooterLine(g, btnY);
         for (int[] b : footerBtns) {
@@ -554,6 +576,26 @@ searchField.setTextShadow(false);
                         }
                         return true;
                     }
+                }
+            }
+            for (int[] r : transferRects) {
+                if (mx >= r[0] && mx <= r[0] + r[2] && my >= r[1] && my <= r[1] + r[3]) {
+                    List<GroupStore.Member> shown = filteredMembers();
+                    if (r[4] < 0 || r[4] >= shown.size()) return true;
+                    GroupStore.Member m = shown.get(r[4]);
+                    long now = Util.getMeasuringTimeMs();
+                    if (transferTarget != null && transferTarget.equals(m.uuid())
+                        && now - transferConfirmAt <= CONFIRM_MS) {
+                        GroupStore.transfer(groupId, m.uuid());
+                        ChatMessageStore.debugLog(() -> "[e33chat] group transfer requested | "
+                            + groupId + " | target=" + m.uuid());
+                        transferTarget = null;
+                        transferConfirmAt = 0L;
+                    } else {
+                        transferTarget = m.uuid();
+                        transferConfirmAt = now;
+                    }
+                    return true;
                 }
             }
             for (int[] r : kickRects) {

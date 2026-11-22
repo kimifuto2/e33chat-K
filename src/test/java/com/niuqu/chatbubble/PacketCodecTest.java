@@ -4,6 +4,7 @@ import com.niuqu.chatbubble.network.ChatMetaPayload;
 import com.niuqu.chatbubble.network.ConfigSyncPayload;
 import com.niuqu.chatbubble.network.ConfigSyncV2Payload;
 import com.niuqu.chatbubble.network.HistoryPayload;
+import com.niuqu.chatbubble.network.ImageMessagePayload;
 import com.niuqu.chatbubble.network.MediaCapPayload;
 import com.niuqu.chatbubble.network.MediaRequestPayload;
 import com.niuqu.chatbubble.network.MediaResponsePayload;
@@ -86,6 +87,25 @@ class PacketCodecTest {
         // 后面全缺：readString 会越界
         ChatMetaPayload decoded = ChatMetaPayload.CODEC.decode(buf);
         assertFalse(decoded.isValid(), "truncated payload must not throw, must be marked invalid");
+    }
+
+    @Test void imageContentIsNotTruncatedAt512() {
+        String content = "x".repeat(600);
+        ImageMessagePayload payload = new ImageMessagePayload(
+            ImageMessagePayload.SCOPE_PUBLIC, "", "", content, "hash");
+        PacketByteBuf buf = new PacketByteBuf(Unpooled.buffer());
+        ImageMessagePayload.CODEC.encode(buf, payload);
+        ImageMessagePayload decoded = ImageMessagePayload.CODEC.decode(buf);
+        assertEquals(content, decoded.content(), "image payload must preserve >512 content");
+    }
+
+    @Test void imageContentMaxLengthIsEnforced() {
+        String content = "y".repeat(ImageMessagePayload.MAX_CONTENT);
+        ImageMessagePayload payload = new ImageMessagePayload(
+            ImageMessagePayload.SCOPE_PUBLIC, "", "", content, "hash");
+        PacketByteBuf buf = new PacketByteBuf(Unpooled.buffer());
+        ImageMessagePayload.CODEC.encode(buf, payload);
+        assertEquals(content, ImageMessagePayload.CODEC.decode(buf).content());
     }
 
     @Test void historyStable() {

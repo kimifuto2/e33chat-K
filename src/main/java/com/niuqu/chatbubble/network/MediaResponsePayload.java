@@ -12,6 +12,7 @@ import net.minecraft.util.Identifier;
  */
 public record MediaResponsePayload(String mediaId, int index, int totalChunks, byte[] chunk)
         implements CustomPayload {
+    public static final int MAX_CHUNK_BYTES = 512 * 1024;
 
     public static final CustomPayload.Id<MediaResponsePayload> ID =
         new CustomPayload.Id<>(Identifier.of("e33chat", "media_response"));
@@ -27,7 +28,7 @@ public record MediaResponsePayload(String mediaId, int index, int totalChunks, b
             buf.readString(),
             buf.readInt(),
             buf.readInt(),
-            buf.readByteArray()
+            buf.readByteArray(MAX_CHUNK_BYTES)
         )
     );
 

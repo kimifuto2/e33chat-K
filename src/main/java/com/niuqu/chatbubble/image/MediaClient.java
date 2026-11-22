@@ -35,14 +35,29 @@ public final class MediaClient {
 
     private static volatile boolean serverEnabled;
     private static final Map<Long, CompletableFuture<String>> UPLOADS = new ConcurrentHashMap<>();
-    private static final Map<String, CompletableFuture<byte[]>> FETCHES = new ConcurrentHashMap<>();
-    private static final Map<String, byte[][]> FETCH_BUFFERS = new ConcurrentHashMap<>();
-    private static final Map<String, Integer> FETCH_COUNTS = new ConcurrentHashMap<>();
+    private static final Map<String, FetchState> FETCHES = new ConcurrentHashMap<>();
+
+    private static final class FetchState {
+        final CompletableFuture<byte[]> future = new CompletableFuture<>();
+        byte[][] chunks;
+        int received;
+        FetchState(int total) { chunks = total > 0 ? new byte[total][] : null; }
+    }
 
     private MediaClient() {}
 
     public static void setServerEnabled(boolean b) { serverEnabled = b; }
     public static boolean serverEnabled() { return serverEnabled; }
+
+    /** 连接边界：清空本连接的媒体能力与所有在途 future，避免换服后沿用旧状态。 */
+    public static void resetConnectionState() {
+        serverEnabled = false;
+        RuntimeException reset = new RuntimeException("media connection reset");
+        for (CompletableFuture<String> f : UPLOADS.values()) f.completeExceptionally(reset);
+        UPLOADS.clear();
+        for (FetchState s : FETCHES.values()) s.future.completeExceptionally(reset);
+        FETCHES.clear();
+    }
 
     /** Client-side receivers; registered from ChatBubbleClientSetup. */
     public static void registerReceivers() {
@@ -54,40 +69,39 @@ public final class MediaClient {
         });
         ClientPlayNetworking.registerGlobalReceiver(MediaResponsePayload.ID, (payload, context) -> {
             String id = payload.mediaId();
+            if (id == null) return;
             if (payload.totalChunks() == 1 && payload.chunk().length == 0) {
-                // Not-found sentinel
-                FETCH_BUFFERS.remove(id);
-                FETCH_COUNTS.remove(id);
-                CompletableFuture<byte[]> f = FETCHES.remove(id);
-                if (f != null) f.completeExceptionally(new RuntimeException("media not found: " + id));
+                FetchState state = FETCHES.remove(id);
+                if (state != null) state.future.completeExceptionally(
+                    new RuntimeException("media not found: " + id));
                 return;
             }
-            byte[][] buf = FETCH_BUFFERS.computeIfAbsent(id, k -> new byte[payload.totalChunks()][]);
-            if (payload.index() < 0 || payload.index() >= buf.length) return;
-            buf[payload.index()] = payload.chunk();
-            int got = FETCH_COUNTS.merge(id, 1, Integer::sum);
-            if (got == payload.totalChunks()) {
-                FETCH_BUFFERS.remove(id);
-                FETCH_COUNTS.remove(id);
-                CompletableFuture<byte[]> f = FETCHES.remove(id);
-                if (f != null) {
-                    int total = 0;
-                    boolean complete = true;
-                    for (byte[] c : buf) {
-                        if (c == null) { complete = false; break; }
-                        total += c.length;
+            FetchState state = FETCHES.get(id);
+            if (state == null) return;
+            int total = payload.totalChunks();
+            if (total <= 0 || payload.index() < 0 || payload.index() >= total) return;
+            if (state.chunks == null || state.chunks.length != total) state.chunks = new byte[total][];
+            if (state.chunks[payload.index()] != null) return;
+            state.chunks[payload.index()] = payload.chunk();
+            state.received++;
+            if (state.received == total) {
+                FETCHES.remove(id, state);
+                int size = 0;
+                boolean complete = true;
+                for (byte[] c : state.chunks) {
+                    if (c == null) { complete = false; break; }
+                    size += c.length;
+                }
+                if (!complete) {
+                    state.future.completeExceptionally(new RuntimeException("media chunk missing: " + id));
+                } else {
+                    byte[] all = new byte[size];
+                    int off = 0;
+                    for (byte[] c : state.chunks) {
+                        System.arraycopy(c, 0, all, off, c.length);
+                        off += c.length;
                     }
-                    if (!complete) {
-                        f.completeExceptionally(new RuntimeException("media chunk missing: " + id));
-                    } else {
-                        byte[] all = new byte[total];
-                        int off = 0;
-                        for (byte[] c : buf) {
-                            System.arraycopy(c, 0, all, off, c.length);
-                            off += c.length;
-                        }
-                        f.complete(all);
-                    }
+                    state.future.complete(all);
                 }
             }
         });
@@ -134,22 +148,24 @@ public final class MediaClient {
     public static byte[] fetch(String mediaId) {
         if (!DiskMediaStore.isValidMediaId(mediaId)) return null;
         if (!ClientPlayNetworking.canSend(MediaRequestPayload.ID)) return null;
-        CompletableFuture<byte[]> done = new CompletableFuture<>();
-        FETCHES.put(mediaId, done);
-        MinecraftClient.getInstance().execute(() -> {
-            try {
-                ClientPlayNetworking.send(new MediaRequestPayload(mediaId));
-            } catch (Throwable t) {
-                FETCHES.remove(mediaId);
-                done.completeExceptionally(t);
-            }
-        });
+        FetchState created = new FetchState(1);
+        FetchState previous = FETCHES.putIfAbsent(mediaId, created);
+        final FetchState state = previous != null ? previous : created;
+        if (previous == null) {
+            MinecraftClient.getInstance().execute(() -> {
+                try {
+                    ClientPlayNetworking.send(new MediaRequestPayload(mediaId));
+                } catch (Throwable t) {
+                    FETCHES.remove(mediaId, state);
+                    state.future.completeExceptionally(t);
+                }
+            });
+        }
         try {
-            return done.get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            return state.future.get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
         } catch (Exception e) {
-            FETCHES.remove(mediaId);
-            FETCH_BUFFERS.remove(mediaId);
-            FETCH_COUNTS.remove(mediaId);
+            FETCHES.remove(mediaId, state);
+            state.future.completeExceptionally(e);
             LOGGER.info("[e33chat] server media fetch {} timed out after {}s", mediaId, TIMEOUT_SECONDS);
             return null;
         }

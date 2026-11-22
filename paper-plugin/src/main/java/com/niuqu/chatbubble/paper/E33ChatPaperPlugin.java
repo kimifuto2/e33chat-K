@@ -3,6 +3,9 @@ package com.niuqu.chatbubble.paper;
 import io.papermc.paper.event.player.AsyncChatEvent;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.World;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandExecutor;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -40,7 +43,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>为什么不是「移植整个模组」：Fabric 服务端侧的逻辑只有「收 payload → 校验 → 广播 payload」，
  * 不碰世界数据/实体/命令树，所以同一套线格式在 Bukkit 的插件通道 API 上可以直接复用。
  */
-public final class E33ChatPaperPlugin extends JavaPlugin implements PluginMessageListener, Listener {
+public final class E33ChatPaperPlugin extends JavaPlugin implements PluginMessageListener, Listener, CommandExecutor {
 
     /** C2S：客户端右键「引用」时上传被引用消息的发送者/正文与两个指纹。 */
     public static final String CHANNEL_QUOTE_SYNC = E33Channels.QUOTE_SYNC;
@@ -93,6 +96,17 @@ public final class E33ChatPaperPlugin extends JavaPlugin implements PluginMessag
         // 群聊后端落盘到 <主世界>/serverconfig/e33chat-groups.json（与 Fabric 端同一路径、同一结构），
         // onEnable 时加载（文件不存在=空），每次群状态变更后保存。世界目录不可用时退化为纯内存态。
         GroupRegistry.init(this, resolveGroupStore());
+        try {
+            GroupRegistry.cleanupInactive(System.currentTimeMillis());
+            getServer().getScheduler().runTaskTimer(this,
+                () -> GroupRegistry.cleanupInactive(System.currentTimeMillis()),
+                20L * 60L, 20L * 60L * 30L);
+        } catch (Throwable t) {
+            getLogger().warning("[E33Chat] group cleanup scheduler failed | " + t);
+        }
+        if (getCommand("e33chat") != null) {
+            getCommand("e33chat").setExecutor(this);
+        }
         // 聊天事件监听：@提及解析（Paper 1.21.x 的 AsyncChatEvent；不能用已废弃的
         // org.bukkit.event.player.AsyncPlayerChatEvent —— 在 Paper 上它不再携带完整语义）。
         // 同一个 Listener 里还挂了 PlayerJoinEvent（登录补发群快照）。
@@ -327,6 +341,14 @@ public final class E33ChatPaperPlugin extends JavaPlugin implements PluginMessag
             GroupRegistry.respondInvite(player, payload);
             return;
         }
+        if (E33Channels.GROUP_TRANSFER.equals(channel)) {
+            GroupInbound.Transfer payload = GroupInbound.decodeTransfer(message);
+            if (!payload.isValid()) return;
+            getLogger().info("[E33Chat] group_transfer recv | player=" + safeName(player)
+                + " | group=" + McCodec.preview(payload.groupId()) + " | target=" + payload.target());
+            GroupRegistry.transfer(player, payload);
+            return;
+        }
         if (E33Channels.GROUP_KICK.equals(channel)) {
             GroupInbound.Kick payload = GroupInbound.decodeKick(message);
             if (!payload.isValid()) {
@@ -398,6 +420,7 @@ public final class E33ChatPaperPlugin extends JavaPlugin implements PluginMessag
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerJoin(PlayerJoinEvent event) {
         try {
+            GroupRegistry.markLogin(event.getPlayer());
             GroupRegistry.syncAllTo(event.getPlayer());
         } catch (Throwable t) {
             getLogger().warning("[E33Chat] group join sync failed | player="
@@ -600,5 +623,38 @@ public final class E33ChatPaperPlugin extends JavaPlugin implements PluginMessag
         } catch (Throwable t) {
             return "<?>";
         }
+    }
+
+    @Override
+    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (!sender.hasPermission("e33chat.admin")) {
+            sender.sendMessage("No permission.");
+            return true;
+        }
+        if (args.length < 2 || !"group".equalsIgnoreCase(args[0])) {
+            sender.sendMessage("Usage: /e33chat group list | delete <groupId> confirm");
+            return true;
+        }
+        if ("list".equalsIgnoreCase(args[1])) {
+            for (GroupRegistry.Group g : GroupRegistry.allGroups()) {
+                sender.sendMessage(g.id() + " | " + g.name() + " | owner=" + g.creator()
+                    + " | members=" + g.size() + " | ownerSeen=" + g.ownerLastSeen());
+            }
+            return true;
+        }
+        if ("delete".equalsIgnoreCase(args[1])) {
+            if (args.length < 4 || !"confirm".equalsIgnoreCase(args[3])) {
+                sender.sendMessage("Usage: /e33chat group delete <groupId> confirm");
+                return true;
+            }
+            if (GroupRegistry.adminDelete(args[2])) {
+                sender.sendMessage("Group deleted: " + args[2]);
+            } else {
+                sender.sendMessage("Group not found or store is read-only: " + args[2]);
+            }
+            return true;
+        }
+        sender.sendMessage("Usage: /e33chat group list | delete <groupId> confirm");
+        return true;
     }
 }

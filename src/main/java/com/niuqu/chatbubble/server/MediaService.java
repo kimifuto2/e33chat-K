@@ -57,15 +57,15 @@ public final class MediaService {
                 ServerPlayNetworking.send(sender, new MediaUploadAckPayload(uploadId, null, "rate limited"));
                 return;
             }
-            result = store.beginUpload(uploadId, sender.getName().getString(),
+            result = store.beginUpload(uploadId, sender.getUuid(), sender.getName().getString(),
                 totalChunks, totalBytes, contentType);
             if (result == null) {
                 // Chunk 0 also carries data — feed it through acceptChunk so a
                 // single-chunk upload completes (and acks) instead of hanging.
-                result = store.acceptChunk(uploadId, index, chunk);
+                result = store.acceptChunk(uploadId, sender.getUuid(), index, chunk);
             }
         } else {
-            result = store.acceptChunk(uploadId, index, chunk);
+            result = store.acceptChunk(uploadId, sender.getUuid(), index, chunk);
         }
         if (result == null) return; // upload still in progress
         store.discardUpload(uploadId);

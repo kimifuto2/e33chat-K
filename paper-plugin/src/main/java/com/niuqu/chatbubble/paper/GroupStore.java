@@ -79,7 +79,7 @@ final class GroupStore {
     /** 原子写用的临时文件后缀（必须与目标文件同目录，否则 rename 可能跨卷）。 */
     static final String TEMP_SUFFIX = ".tmp";
     /** 文件格式版本 —— Fabric 写 {@code "version": 1}；读取时不拒绝更高版本（向后兼容）。 */
-    static final int VERSION = 1;
+    static final int VERSION = 2;
 
     /**
      * 读文件的大小上限。理论上限 = 4096 群 × 64 人 × 约 60 字节 ≈ 250 KB，
@@ -108,6 +108,8 @@ final class GroupStore {
     static final class Snapshot {
         final List<GroupRegistry.Group> groups = new ArrayList<>();
         final Map<UUID, LinkedHashSet<UUID>> pending = new LinkedHashMap<>();
+        boolean overLimit;
+        boolean migrated;
     }
 
     // ================================================================ 读
@@ -149,13 +151,18 @@ final class GroupStore {
         List<Object> groupList = asList(rootMap.get("groups"));
         if (groupList != null) {
             for (Object item : groupList) {
-                if (snap.groups.size() >= MAX_GROUPS) {
-                    break;
+                Map<String, Object> groupMap = asMap(item);
+                if (groupMap != null && (groupMap.get("createdAt") == null
+                    || groupMap.get("ownerLastSeen") == null)) {
+                    snap.migrated = true;
                 }
-                GroupRegistry.Group group = readGroup(asMap(item));
+                GroupRegistry.Group group = readGroup(groupMap);
                 if (group != null) {
                     snap.groups.add(group);
                 }
+            }
+            if (snap.groups.size() > MAX_GROUPS) {
+                snap.overLimit = true;
             }
         }
         readPending(rootMap.get("pendingInvites"), snap);
@@ -173,7 +180,9 @@ final class GroupStore {
         }
         String name = asString(map.get("name"));
         UUID creator = parseUuid(asString(map.get("creator")));   // "" / 缺失 / 非法 → null（未知）
-        GroupRegistry.Group group = new GroupRegistry.Group(id, name, creator);
+        long createdAt = parseLong(map.get("createdAt"), System.currentTimeMillis());
+        long ownerLastSeen = parseLong(map.get("ownerLastSeen"), createdAt);
+        GroupRegistry.Group group = new GroupRegistry.Group(id, name, creator, createdAt, ownerLastSeen);
         List<Object> members = asList(map.get("members"));
         if (members != null) {
             for (Object memberItem : members) {
@@ -228,6 +237,15 @@ final class GroupStore {
         }
     }
 
+    private static long parseLong(Object value, long fallback) {
+        if (value instanceof Number n) return n.longValue();
+        try {
+            return value == null ? fallback : Long.parseLong(String.valueOf(value));
+        } catch (Throwable t) {
+            return fallback;
+        }
+    }
+
     // ================================================================ 写
 
     /**
@@ -248,6 +266,9 @@ final class GroupStore {
         appendPending(out, pending);
         out.append("\n}\n");
         byte[] bytes = out.toString().getBytes(StandardCharsets.UTF_8);
+        if (bytes.length > MAX_FILE_BYTES) {
+            throw new IOException("serialized group store too large: " + bytes.length);
+        }
         writeAtomic(bytes);
         return bytes.length;
     }
@@ -278,6 +299,8 @@ final class GroupStore {
             out.append("      \"creator\": ");
             appendString(out, group.creator() == null ? "" : group.creator().toString());
             out.append(",\n");
+            out.append("      \"createdAt\": ").append(group.createdAt()).append(",\n");
+            out.append("      \"ownerLastSeen\": ").append(group.ownerLastSeen()).append(",\n");
             out.append("      \"members\": ");
             appendMembers(out, group.memberList());
             out.append("\n    }");

@@ -13,6 +13,7 @@ import net.minecraft.util.Identifier;
 public record MediaUploadPayload(long uploadId, int index, int totalChunks,
                                  int totalBytes, String contentType, byte[] chunk)
         implements CustomPayload {
+    public static final int MAX_CHUNK_BYTES = 512 * 1024;
 
     public static final CustomPayload.Id<MediaUploadPayload> ID =
         new CustomPayload.Id<>(Identifier.of("e33chat", "media_upload"));
@@ -32,7 +33,7 @@ public record MediaUploadPayload(long uploadId, int index, int totalChunks,
             buf.readInt(),
             buf.readInt(),
             buf.readString(),
-            buf.readByteArray()
+            buf.readByteArray(MAX_CHUNK_BYTES)
         )
     );
 

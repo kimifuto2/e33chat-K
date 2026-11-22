@@ -5,3 +5,9 @@ api-version: '1.21'
 description: E33Chat server-side bridge for Paper - relays quote_sync/chat_meta, group chat (group_*) and player actions (player_action) so Fabric clients work together without the mod on the server.
 authors:
   - niuqu
+
+commands:
+  e33chat:
+    description: E33Chat group administration
+    permission: e33chat.admin
+    permission-message: No permission.

@@ -71,7 +71,14 @@ public final class HistoryStore {
         if (s == null) return false;
         s = s.trim();
         if (!s.startsWith("/")) return false;
-        int sp = s.indexOf(' ');
+        int sp = -1;
+        for (int i = 1; i < s.length(); i++) {
+            char ch = s.charAt(i);
+            if (Character.isWhitespace(ch) || Character.isSpaceChar(ch)) {
+                sp = i;
+                break;
+            }
+        }
         String cmd = sp < 0 ? s.substring(1) : s.substring(1, sp);
         if (cmd.isEmpty()) return false;
         switch (cmd.toLowerCase(java.util.Locale.ROOT)) {

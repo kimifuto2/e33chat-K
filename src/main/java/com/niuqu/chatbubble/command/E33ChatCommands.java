@@ -4,6 +4,7 @@ import com.niuqu.chatbubble.ChatBubbleMod;
 import com.niuqu.chatbubble.chat.TemplateMatcher;
 import com.niuqu.chatbubble.config.ServerConfig;
 import com.niuqu.chatbubble.config.ServerConfigManager;
+import com.niuqu.chatbubble.server.GroupRegistry;
 import com.niuqu.chatbubble.network.ServerConfigScreenPayload;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -69,12 +70,24 @@ public class E33ChatCommands {
                                 IntegerArgumentType.getInteger(ctx, "index"),
                                 StringArgumentType.getString(ctx, "text")))))));
 
+            var group = net.minecraft.server.command.CommandManager.literal("group")
+                .requires(s -> s.getPermissions().hasPermission(new net.minecraft.command.permission.Permission.Level(
+                    net.minecraft.command.permission.PermissionLevel.GAMEMASTERS)))
+                .then(net.minecraft.server.command.CommandManager.literal("list")
+                    .executes(ctx -> listGroups(ctx.getSource())))
+                .then(net.minecraft.server.command.CommandManager.literal("delete")
+                    .then(net.minecraft.server.command.CommandManager.argument("groupId", StringArgumentType.word())
+                        .then(net.minecraft.server.command.CommandManager.literal("confirm")
+                            .executes(ctx -> deleteGroup(ctx.getSource(),
+                                StringArgumentType.getString(ctx, "groupId"))))));
+
             dispatcher.register(net.minecraft.server.command.CommandManager.literal("e33chat")
                 .then(net.minecraft.server.command.CommandManager.literal("gui")
                     .requires(s -> s.getPermissions().hasPermission(new net.minecraft.command.permission.Permission.Level(
                         net.minecraft.command.permission.PermissionLevel.GAMEMASTERS)))
                     .executes(ctx -> openServerGui(ctx.getSource())))
-                .then(tpl));
+                .then(tpl)
+                .then(group));
         });
     }
 
@@ -226,5 +239,21 @@ public class E33ChatCommands {
             if (!n.isEmpty() && (name.equals(n) || name.contains(n))) return true;
         }
         return false;
+    }
+
+    private static int listGroups(ServerCommandSource src) {
+        for (GroupRegistry.Group g : GroupRegistry.allGroups()) {
+            src.sendFeedback(() -> Text.literal(g.id() + " | " + g.name()
+                + " | owner=" + g.creator() + " | members=" + g.size()
+                + " | ownerSeen=" + g.ownerLastSeen()), false);
+        }
+        return 1;
+    }
+
+    private static int deleteGroup(ServerCommandSource src, String groupId) {
+        boolean ok = GroupRegistry.adminDelete(src.getServer(), groupId);
+        if (ok) src.sendFeedback(() -> Text.literal("group deleted: " + groupId), false);
+        else src.sendError(Text.literal("group not found or store is read-only: " + groupId));
+        return ok ? 1 : 0;
     }
 }

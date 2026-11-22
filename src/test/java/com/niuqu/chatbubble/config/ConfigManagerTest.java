@@ -19,21 +19,25 @@ class ConfigManagerTest {
     @Test
     void zeroValuesSurviveRoundTrip() throws Exception {
         Path p = dir.resolve("client.json");
-        ChatBubbleConfig c = ChatBubbleConfig.defaults()
-            .withTheme("dark"); // use a with-method to mutate through the record
-        // Build a config with explicit zero values via the full constructor.
-        c = new ChatBubbleConfig(
-            true, "dark", true, false, true, false, true,
-            false, 0, 5, 1000, 4,
-            "#1E90FF", "#4A4A4A", "#FFFFFF", "#FFFFFF",
-            false, false, true, false, true, false,
-            java.util.List.of(), java.util.List.of(), java.util.List.of(),
-            true, true, 0, true, true, true,
-            true, 0, 0, false, false, false, 0, 0, 0, 3,
-            "slide", "slide", "fade", "fade",
-            true, true,
-            null, null, null, null,
-            6, 20, true, false, 0, 100);
+        ChatBubbleConfig defaults = ChatBubbleConfig.defaults();
+        // 用默认配置构造一份只把 5 个零值字段置 0 的配置；避免测试随 record 字段增加而漂移。
+        java.lang.reflect.RecordComponent[] components = ChatBubbleConfig.class.getRecordComponents();
+        Object[] args = new Object[components.length];
+        try {
+            for (int i = 0; i < components.length; i++) {
+                args[i] = components[i].getAccessor().invoke(defaults);
+            }
+            String[] zeroFields = {"panelOpacity", "soundVolume", "bannerCornerRadius",
+                "mentionBannerDuration", "bannerOpacity"};
+            for (int i = 0; i < components.length; i++) {
+                for (String field : zeroFields) {
+                    if (field.equals(components[i].getName())) args[i] = 0;
+                }
+            }
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException(e);
+        }
+        ChatBubbleConfig c = (ChatBubbleConfig) ChatBubbleConfig.class.getDeclaredConstructors()[0].newInstance(args);
         ConfigManager.save(p, c);
 
         ChatBubbleConfig loaded = ConfigManager.load(p);

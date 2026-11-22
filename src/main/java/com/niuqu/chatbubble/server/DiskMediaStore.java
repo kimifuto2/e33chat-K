@@ -5,8 +5,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
@@ -28,6 +30,10 @@ public final class DiskMediaStore {
     public static final long QUOTA_BYTES = 512L * 1024 * 1024;
     public static final int CHUNK_BYTES = 512 * 1024;
     public static final long TTL_MILLIS = 7L * 24 * 60 * 60 * 1000; // 7 days
+    public static final int MAX_SESSIONS = 64;
+    public static final int MAX_SESSIONS_PER_PLAYER = 4;
+    public static final long SESSION_TIMEOUT_MILLIS = 10L * 60 * 1000;
+    public static final int MAX_CONTENT_TYPE = 64;
 
     private static final Pattern MEDIA_ID = Pattern.compile("[0-9a-f]{32}");
 
@@ -37,8 +43,9 @@ public final class DiskMediaStore {
     private final long ttlMillis;
     private final Map<Long, Session> sessions = new ConcurrentHashMap<>();
 
-    private record Session(long uploadId, String playerName, int totalChunks,
-                           long totalBytes, String contentType, Path tmpFile, int received) {}
+    private record Session(long uploadId, UUID ownerId, String playerName, int totalChunks,
+                           long totalBytes, String contentType, Path tmpFile, int received,
+                           long receivedBytes, long createdAt) {}
 
     public DiskMediaStore(Path dir) {
         this(dir, MAX_SINGLE_BYTES, QUOTA_BYTES, TTL_MILLIS);
@@ -67,13 +74,32 @@ public final class DiskMediaStore {
     /** First chunk: validate size/quota and create the session. Null on success, else error reason. */
     public synchronized String beginUpload(long uploadId, String playerName, int totalChunks,
                                            long totalBytes, String contentType) {
+        return beginUpload(uploadId, null, playerName, totalChunks, totalBytes, contentType);
+    }
+
+    public synchronized String beginUpload(long uploadId, UUID ownerId, String playerName, int totalChunks,
+                                           long totalBytes, String contentType) {
+        cleanupExpiredSessions(System.currentTimeMillis());
         if (totalBytes <= 0 || totalBytes > maxSingle) return "too large";
-        if (totalChunks < 1 || totalChunks > totalChunksFor(maxSingle)) return "bad chunks";
-        if (dirSize() + totalBytes > quota) return "quota exceeded";
+        if (totalChunks != totalChunksFor(totalBytes)) return "bad chunks";
+        if (contentType != null && contentType.length() > MAX_CONTENT_TYPE) return "bad content type";
+        if (sessions.containsKey(uploadId)) return "upload id collision";
+        if (sessions.size() >= MAX_SESSIONS) return "too many uploads";
+        if (ownerId != null) {
+            int mine = 0;
+            for (Session existing : sessions.values()) {
+                if (ownerId.equals(existing.ownerId())) mine++;
+            }
+            if (mine >= MAX_SESSIONS_PER_PLAYER) return "too many uploads";
+        }
+        long reserved = 0;
+        for (Session existing : sessions.values()) reserved += existing.totalBytes();
+        if (dirSizeExcludingTemps() + reserved + totalBytes > quota) return "quota exceeded";
         try {
             Files.createDirectories(dir);
-            Session s = new Session(uploadId, playerName, totalChunks, totalBytes,
-                contentType, dir.resolve(".upload-" + uploadId), 0);
+            long now = System.currentTimeMillis();
+            Session s = new Session(uploadId, ownerId, playerName, totalChunks, totalBytes,
+                contentType, dir.resolve(".upload-" + uploadId), 0, 0, now);
             sessions.put(uploadId, s);
             return null;
         } catch (IOException e) {
@@ -87,24 +113,42 @@ public final class DiskMediaStore {
      * (success) or an error reason (failure, session discarded).
      */
     public synchronized String acceptChunk(long uploadId, int index, byte[] chunk) {
+        return acceptChunk(uploadId, null, index, chunk);
+    }
+
+    public synchronized String acceptChunk(long uploadId, UUID ownerId, int index, byte[] chunk) {
+        cleanupExpiredSessions(System.currentTimeMillis());
         Session s = sessions.get(uploadId);
         if (s == null) return null;
+        if (s.ownerId() != null && !s.ownerId().equals(ownerId)) {
+            log("media upload rejected | owner mismatch | upload=" + uploadId);
+            return "not owner";
+        }
         if (index != s.received()) {
             discardSession(s);
             return "chunk out of order";
+        }
+        if (chunk == null || chunk.length == 0 || chunk.length > CHUNK_BYTES) {
+            discardSession(s);
+            return "bad chunk";
+        }
+        if (s.receivedBytes() + chunk.length > s.totalBytes()) {
+            discardSession(s);
+            return "size mismatch";
         }
         try {
             Path tmp = s.tmpFile();
             try (FileOutputStream out = new FileOutputStream(tmp.toFile(), true)) {
                 out.write(chunk);
             }
-            Session next = new Session(s.uploadId(), s.playerName(), s.totalChunks(),
-                s.totalBytes(), s.contentType(), tmp, s.received() + 1);
+            Session next = new Session(s.uploadId(), s.ownerId(), s.playerName(), s.totalChunks(),
+                s.totalBytes(), s.contentType(), tmp, s.received() + 1,
+                s.receivedBytes() + chunk.length, s.createdAt());
             sessions.put(uploadId, next);
             if (next.received() == next.totalChunks()) {
                 sessions.remove(uploadId);
                 try {
-                    if (Files.size(tmp) != s.totalBytes()) {
+                    if (next.receivedBytes() != s.totalBytes() || Files.size(tmp) != s.totalBytes()) {
                         Files.deleteIfExists(tmp);
                         return "size mismatch";
                     }
@@ -138,6 +182,13 @@ public final class DiskMediaStore {
     }
 
     /** Discard in-flight uploads started by a player who left (disconnect). */
+    public synchronized void discardUploadsFor(UUID ownerId) {
+        if (ownerId == null) return;
+        for (Session s : new ArrayList<>(sessions.values())) {
+            if (ownerId.equals(s.ownerId())) discardSession(s);
+        }
+    }
+
     public synchronized void discardUploadsFor(String playerName) {
         for (Session s : sessions.values()) {
             if (playerName != null && playerName.equals(s.playerName())) {
@@ -246,6 +297,35 @@ public final class DiskMediaStore {
         if (now - lastCleanupAt < CLEAN_INTERVAL_MILLIS) return;
         lastCleanupAt = now;
         cleanupExpired(now);
+    }
+
+    private long dirSizeExcludingTemps() {
+        try {
+            if (!Files.isDirectory(dir)) return 0;
+            long total = 0;
+            try (var stream = Files.list(dir)) {
+                for (Path p : (Iterable<Path>) stream::iterator) {
+                    if (Files.isRegularFile(p) && !p.getFileName().toString().startsWith(".upload-")) {
+                        total += Files.size(p);
+                    }
+                }
+            }
+            return total;
+        } catch (IOException e) {
+            return 0;
+        }
+    }
+
+    private void cleanupExpiredSessions(long now) {
+        for (Session s : new ArrayList<>(sessions.values())) {
+            if (now - s.createdAt() > SESSION_TIMEOUT_MILLIS) {
+                discardSession(s);
+            }
+        }
+    }
+
+    private static void log(String msg) {
+        org.slf4j.LoggerFactory.getLogger("e33chat").info("[e33chat] " + msg);
     }
 
     private long dirSize() {

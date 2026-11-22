@@ -19,6 +19,7 @@ import com.niuqu.chatbubble.network.ImageMessageRelayPayload;
 import com.niuqu.chatbubble.network.GroupMessageRelayPayload;
 import com.niuqu.chatbubble.network.GroupRenamePayload;
 import com.niuqu.chatbubble.network.GroupSyncPayload;
+import com.niuqu.chatbubble.network.GroupTransferPayload;
 import com.niuqu.chatbubble.network.HistoryPayload;
 import com.niuqu.chatbubble.network.MediaRequestPayload;
 import com.niuqu.chatbubble.network.MediaResponsePayload;
@@ -36,6 +37,7 @@ import net.fabricmc.api.ModInitializer;
 import com.mojang.brigadier.ParseResults;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.message.v1.ServerMessageEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
@@ -79,6 +81,7 @@ public class ChatBubbleMod implements ModInitializer {
     private static List<String> whisperTemplates = List.of();
     private static boolean configLoaded;
     private static volatile com.niuqu.chatbubble.server.DiskMediaStore mediaStore;
+    private static long lastGroupCleanupAt;
 
     /** Lazily-created per-world media store (next to the server config). */
     private static com.niuqu.chatbubble.server.DiskMediaStore mediaStore(net.minecraft.server.MinecraftServer server) {
@@ -233,6 +236,7 @@ public class ChatBubbleMod implements ModInitializer {
         PayloadTypeRegistry.playC2S().register(GroupLeavePayload.ID, GroupLeavePayload.CODEC);
         PayloadTypeRegistry.playC2S().register(GroupRenamePayload.ID, GroupRenamePayload.CODEC);
         PayloadTypeRegistry.playC2S().register(GroupDisbandPayload.ID, GroupDisbandPayload.CODEC);
+        PayloadTypeRegistry.playC2S().register(GroupTransferPayload.ID, GroupTransferPayload.CODEC);
         // S2C：群快照 / 消息转发 / 事件（被拉群、被踢、被解散…）/ 进群邀请与回应回执
         PayloadTypeRegistry.playS2C().register(GroupSyncPayload.ID, GroupSyncPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(GroupMessageRelayPayload.ID, GroupMessageRelayPayload.CODEC);
@@ -412,6 +416,8 @@ public class ChatBubbleMod implements ModInitializer {
             // 群聊：把该玩家所属的**全部群**补发一遍（GroupSync）。客户端因此不需要自己
             // 持久化成员表；服务端重启丢群是已知 MVP 限制（见 README）。
             try {
+                com.niuqu.chatbubble.server.GroupRegistry.ensureLoaded(server);
+                com.niuqu.chatbubble.server.GroupRegistry.markLogin(handler.player.getUuid());
                 com.niuqu.chatbubble.server.GroupRegistry.syncAllTo(server, handler.player);
             } catch (Throwable t) {
                 srvLog("group join sync failed | " + t);
@@ -426,6 +432,26 @@ public class ChatBubbleMod implements ModInitializer {
         // /e33chat template commands + /e33chat gui
         com.niuqu.chatbubble.command.E33ChatCommands.register();
 
+        // 群主 60 天未登录清理：启动时先 ensureLoaded，之后每 30 分钟检查一次。
+        ServerLifecycleEvents.SERVER_STARTED.register(server -> {
+            try {
+                com.niuqu.chatbubble.server.GroupRegistry.ensureLoaded(server);
+                com.niuqu.chatbubble.server.GroupRegistry.cleanupInactive(server, System.currentTimeMillis());
+            } catch (Throwable t) {
+                srvLog("group cleanup start failed | " + t);
+            }
+        });
+        ServerTickEvents.END_SERVER_TICK.register(server -> {
+            long now = System.currentTimeMillis();
+            if (now - lastGroupCleanupAt < 30L * 60L * 1000L) return;
+            lastGroupCleanupAt = now;
+            try {
+                com.niuqu.chatbubble.server.GroupRegistry.cleanupInactive(server, now);
+            } catch (Throwable t) {
+                srvLog("group cleanup failed | " + t);
+            }
+        });
+
         // Drop the per-world media store on server stop so the next world (which may
         // be a different save directory) lazily rebuilds it against its own path;
         // also discard any in-flight upload sessions and their temp files.
@@ -433,7 +459,19 @@ public class ChatBubbleMod implements ModInitializer {
             DiskMediaStore s = mediaStore;
             if (s != null) s.discardAllUploads();
             mediaStore = null;
-            // 群聊：丢掉本世界的内存态（下一个世界按自己的 serverconfig 文件重新加载）
+            // 所有世界级静态状态必须清空，否则切换单机世界时会沿用旧配置/历史/引用状态。
+            pendingQuotes.clear();
+            historyBuffer.clear();
+            broadcastQuotes.clear();
+            configLoaded = false;
+            historyEnabled = false;
+            useTpa = false;
+            templateDebug = false;
+            mediaEnabled = false;
+            mediaAutoClean = true;
+            chatTemplates = List.of();
+            whisperTemplates = List.of();
+            lastGroupCleanupAt = 0L;
             try {
                 com.niuqu.chatbubble.server.GroupRegistry.reset();
             } catch (Throwable ignored) {
@@ -443,7 +481,7 @@ public class ChatBubbleMod implements ModInitializer {
         // Discard a leaving player's in-flight upload session (and temp file).
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
             DiskMediaStore s = mediaStore;
-            if (s != null) s.discardUploadsFor(handler.player.getName().getString());
+            if (s != null) s.discardUploadsFor(handler.player.getUuid());
         });
     }
 
@@ -547,7 +585,20 @@ public class ChatBubbleMod implements ModInitializer {
                 srvLog("group_disband failed | " + t);
             }
         });
-        srvLog("group receivers registered | c2s=8 | s2c=4");
+
+        ServerPlayNetworking.registerGlobalReceiver(GroupTransferPayload.ID, (payload, context) -> {
+            try {
+                if (!payload.isValid()) {
+                    srvLog("group_transfer ignored | invalid payload | " + payload);
+                    return;
+                }
+                srvLog("group_transfer recv | player=" + context.player().getName().getString() + " | " + payload);
+                com.niuqu.chatbubble.server.GroupRegistry.transfer(context.server(), context.player(), payload);
+            } catch (Throwable t) {
+                srvLog("group_transfer failed | " + t);
+            }
+        });
+        srvLog("group receivers registered | c2s=9 | s2c=4");
     }
 
     // Called from CommandManagerMixin.execute (parity with Forge ChatServerListener.onCommand):    // /msg /tell /w /whisper carry a quote the client synced (QuoteSyncPayload); consume it

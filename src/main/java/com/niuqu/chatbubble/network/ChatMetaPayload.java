@@ -1,5 +1,7 @@
 package com.niuqu.chatbubble.network;
 
+import com.niuqu.chatbubble.network.GroupWire;
+
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.packet.CustomPayload;
@@ -46,8 +48,10 @@ public record ChatMetaPayload(UUID senderUUID, String senderName, String message
             buf.writeString(str(value.messageHash));
             buf.writeString(str(value.quoteSender));
             buf.writeString(str(value.quoteContent));
-            buf.writeCollection(value.mentionTargets != null ? value.mentionTargets : List.of(),
-                PacketByteBuf::writeString);
+            List<String> mentions = value.mentionTargets == null ? List.of() : value.mentionTargets;
+            int mentionCount = Math.min(mentions.size(), 64);
+            buf.writeVarInt(mentionCount);
+            for (int i = 0; i < mentionCount; i++) GroupWire.writeString(buf, mentions.get(i), 64);
             buf.writeString(str(value.quotedHash));
         },
         buf -> {
@@ -58,13 +62,16 @@ public record ChatMetaPayload(UUID senderUUID, String senderName, String message
                 } catch (Throwable ignored) {
                     // 损坏的 UUID 只让这条 meta 失效，不影响连接
                 }
-                String senderName = buf.readString();
-                String messageHash = buf.readString();
-                String quoteSender = buf.readString();
-                String quoteContent = buf.readString();
-                List<String> mentions = buf.readList(PacketByteBuf::readString);
+                String senderName = GroupWire.readString(buf, 64);
+                String messageHash = GroupWire.readString(buf, 64);
+                String quoteSender = GroupWire.readString(buf, 64);
+                String quoteContent = GroupWire.readString(buf, 8192);
+                int mentionCount = buf.readVarInt();
+                if (mentionCount < 0 || mentionCount > 64) throw new IllegalArgumentException("bad mentions");
+                List<String> mentions = new ArrayList<>(mentionCount);
+                for (int i = 0; i < mentionCount; i++) mentions.add(GroupWire.readString(buf, 64));
                 // 追加字段：旧版服务端不发 → 读不到就当空（退化成内容兜底）
-                String quotedHash = buf.isReadable() ? buf.readString() : "";
+                String quotedHash = buf.isReadable() ? GroupWire.readString(buf, 64) : "";
                 if (sender == null) return invalid();
                 return new ChatMetaPayload(sender, senderName, messageHash, quoteSender, quoteContent,
                     mentions != null ? mentions : List.of(), quotedHash);

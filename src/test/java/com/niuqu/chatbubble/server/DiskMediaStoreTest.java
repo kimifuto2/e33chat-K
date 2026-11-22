@@ -75,8 +75,9 @@ class DiskMediaStoreTest {
     void rejectsOutOfOrderChunk() throws IOException {
         Path dir = Files.createTempDirectory("e33media");
         DiskMediaStore store = new DiskMediaStore(dir);
-        assertNull(store.beginUpload(1, "alice", 2, 100, "image/png"));
-        String r = store.acceptChunk(1, 1, new byte[50]); // skip index 0
+        int total = DiskMediaStore.CHUNK_BYTES + 1;
+        assertNull(store.beginUpload(1, "alice", 2, total, "image/png"));
+        String r = store.acceptChunk(1, 1, new byte[1]); // skip index 0
         assertEquals("chunk out of order", r);
         assertEquals(-1, store.sizeOf("whatever"));
         // session discarded: a valid 0-chunk no longer accepted
@@ -87,10 +88,11 @@ class DiskMediaStoreTest {
     void rejectsSizeMismatch() throws IOException {
         Path dir = Files.createTempDirectory("e33media");
         DiskMediaStore store = new DiskMediaStore(dir);
-        assertNull(store.beginUpload(1, "alice", 2, 100, "image/png"));
-        String r = store.acceptChunk(1, 0, new byte[50]);
+        int total = DiskMediaStore.CHUNK_BYTES + 50;
+        assertNull(store.beginUpload(1, "alice", 2, total, "image/png"));
+        String r = store.acceptChunk(1, 0, new byte[DiskMediaStore.CHUNK_BYTES]);
         assertNull(r);
-        r = store.acceptChunk(1, 1, new byte[60]); // 110 != 100
+        r = store.acceptChunk(1, 1, new byte[60]); // 多出 10 字节
         assertNotNull(r);
         assertNotEquals("", r);
         assertEquals("size mismatch", r);

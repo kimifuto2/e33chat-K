@@ -14,6 +14,7 @@ import java.util.UUID;
  *   e33chat:group_message         String groupId; String content; String msgHash
  *   e33chat:group_invite          String groupId; VarInt n + n × UUID memberUuid
  *   e33chat:group_invite_respond  String groupId; boolean accept
+ *   e33chat:group_transfer        String groupId; UUID target
  *   e33chat:group_kick            String groupId; UUID target
  *   e33chat:group_leave           String groupId
  *   e33chat:group_rename          String groupId; String name
@@ -66,6 +67,13 @@ final class GroupInbound {
     record InviteRespond(String groupId, boolean accept) {
         boolean isValid() {
             return GroupWire.parseUuid(groupId) != null;
+        }
+    }
+
+    /** {@code group_transfer}：群主转让。 */
+    record Transfer(String groupId, UUID target) {
+        boolean isValid() {
+            return GroupWire.parseUuid(groupId) != null && !GroupWire.isNil(target);
         }
     }
 
@@ -135,6 +143,17 @@ final class GroupInbound {
             return new InviteRespond(groupId, accept);
         } catch (Throwable t) {
             return new InviteRespond("", false);
+        }
+    }
+
+    static Transfer decodeTransfer(byte[] data) {
+        try {
+            McCodec.Reader in = new McCodec.Reader(data);
+            String groupId = readString(in);
+            UUID target = in.isReadable() ? in.readUuid() : null;
+            return new Transfer(groupId, target);
+        } catch (Throwable t) {
+            return new Transfer("", null);
         }
     }
 

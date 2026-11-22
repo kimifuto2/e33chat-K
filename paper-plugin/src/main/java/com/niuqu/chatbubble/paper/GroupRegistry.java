@@ -49,6 +49,11 @@ final class GroupRegistry {
 
     /** 群人数上限（含 pending），与 Fabric {@code GroupRegistry.MAX_MEMBERS} 同值。 */
     static final int MAX_MEMBERS = GroupWire.MAX_LIST;
+    static final int MAX_GROUPS = 4096;
+    static final int MAX_GROUPS_PER_PLAYER = 20;
+    static final long CREATE_COOLDOWN_MS = 10_000L;
+    static final long OWNER_INACTIVE_MS = 60L * 24 * 60 * 60 * 1000;
+    static final long PENDING_INVITE_TTL_MS = 10L * 60 * 1000;
 
     /** 群事件 kind —— 与 Fabric {@code GroupEventPayload} 的常量逐字一致。 */
     static final String KIND_INVITED = "INVITED";
@@ -68,12 +73,20 @@ final class GroupRegistry {
         private final UUID id;
         private String name;
         private final LinkedHashMap<UUID, String> members = new LinkedHashMap<>();
-        private final UUID creator;
+        private UUID creator;
+        private long createdAt;
+        private long ownerLastSeen;
 
         Group(UUID id, String name, UUID creator) {
+            this(id, name, creator, System.currentTimeMillis(), System.currentTimeMillis());
+        }
+
+        Group(UUID id, String name, UUID creator, long createdAt, long ownerLastSeen) {
             this.id = id;
             this.name = name == null ? "" : name;
             this.creator = creator;
+            this.createdAt = createdAt > 0 ? createdAt : System.currentTimeMillis();
+            this.ownerLastSeen = ownerLastSeen > 0 ? ownerLastSeen : this.createdAt;
         }
 
         UUID id() {
@@ -86,6 +99,14 @@ final class GroupRegistry {
 
         UUID creator() {
             return creator;
+        }
+
+        long createdAt() {
+            return createdAt;
+        }
+
+        long ownerLastSeen() {
+            return ownerLastSeen;
         }
 
         boolean hasMember(UUID uuid) {
@@ -129,6 +150,10 @@ final class GroupRegistry {
     private static final Map<UUID, Group> groups = new LinkedHashMap<>();
     /** groupId → 还没回应的被邀请者（落盘在文件的 pendingInvites 字段里，见类注释）。 */
     private static final Map<UUID, LinkedHashSet<UUID>> pendingInvites = new LinkedHashMap<>();
+    private static final Map<UUID, Map<UUID, Long>> pendingInviteAt = new LinkedHashMap<>();
+    private static final Map<UUID, Long> createCooldown = new LinkedHashMap<>();
+    private static boolean persistenceReadOnly;
+    private static boolean creationDisabled;
 
     /** 由 {@link E33ChatPaperPlugin#onEnable()} 注入；卸载时置回 null。 */
     private static Plugin plugin;
@@ -147,6 +172,10 @@ final class GroupRegistry {
         plugin = owner;
         groups.clear();
         pendingInvites.clear();
+        pendingInviteAt.clear();
+        createCooldown.clear();
+        persistenceReadOnly = false;
+        creationDisabled = false;
         store = storeFile == null ? null : new GroupStore(storeFile);
         if (store == null) {
             log("store disabled (in-memory only)");
@@ -174,6 +203,10 @@ final class GroupRegistry {
         save("disable");
         groups.clear();
         pendingInvites.clear();
+        pendingInviteAt.clear();
+        createCooldown.clear();
+        persistenceReadOnly = false;
+        creationDisabled = false;
         plugin = null;
         store = null;
     }
@@ -198,7 +231,7 @@ final class GroupRegistry {
     /** {@link #init} 之后调用一次：把磁盘上的群与 pending 邀请读进内存（坏文件只丢自己）。 */
     private static void load() {
         GroupStore s = store;
-        if (s == null) {
+        if (s == null || persistenceReadOnly) {
             return;
         }
         try {
@@ -206,6 +239,11 @@ final class GroupRegistry {
             for (Group g : snapshot.groups) {
                 groups.put(g.id(), g);
             }
+            creationDisabled = snapshot.overLimit || groups.size() > MAX_GROUPS;
+            if (creationDisabled) {
+                log("warn | group count over limit | groups=" + groups.size());
+            }
+            if (snapshot.migrated && !persistenceReadOnly) save("migration");
             // pending 里只保留「群还在」的条目，避免手改文件留下野条目
             for (Map.Entry<UUID, LinkedHashSet<UUID>> entry : snapshot.pending.entrySet()) {
                 if (groups.containsKey(entry.getKey()) && !entry.getValue().isEmpty()) {
@@ -219,9 +257,10 @@ final class GroupRegistry {
                     + " | file=" + s.file());
             }
         } catch (Throwable t) {
-            // 坏文件/无读权限：保持空状态继续跑（不崩、不清文件，方便运维修）
-            log("store load failed | file=" + s.file() + " | " + t.getClass().getSimpleName()
-                + ": " + t.getMessage());
+            // 坏文件/无读权限：标记只读，禁止任何保存覆盖原文件（含 onDisable）。
+            persistenceReadOnly = true;
+            log("store load failed | read-only | file=" + s.file() + " | "
+                + t.getClass().getSimpleName() + ": " + t.getMessage());
         }
     }
 
@@ -350,6 +389,15 @@ final class GroupRegistry {
             return sent;
         }
         LinkedHashSet<UUID> pending = pendingInvites.computeIfAbsent(g.id(), k -> new LinkedHashSet<>());
+        Map<UUID, Long> expiry = pendingInviteAt.computeIfAbsent(g.id(), k -> new LinkedHashMap<>());
+        long now = System.currentTimeMillis();
+        for (UUID old : new ArrayList<>(pending)) {
+            Long exp = expiry.get(old);
+            if (exp != null && now > exp) {
+                pending.remove(old);
+                expiry.remove(old);
+            }
+        }
         UUID inviterId = inviter == null ? null : inviter.getUniqueId();
         String inviterName = inviter == null ? "" : inviter.getName();
         for (UUID uuid : targets) {
@@ -371,6 +419,7 @@ final class GroupRegistry {
                 continue;
             }
             pending.add(uuid);
+            expiry.put(uuid, now + PENDING_INVITE_TTL_MS);
             sendInviteEvent(target, g, INVITE_INVITE, inviterName, target.getName());
             sent.add(uuid);
         }
@@ -405,9 +454,29 @@ final class GroupRegistry {
         if (creator == null || payload == null) {
             return;
         }
+        if (groups.size() < MAX_GROUPS) creationDisabled = false;
+        if (creationDisabled || groups.size() >= MAX_GROUPS) {
+            creator.sendMessage("Server group limit reached.");
+            return;
+        }
+        int owned = 0;
+        for (Group existing : groups.values()) {
+            if (creator.getUniqueId().equals(existing.creator())) owned++;
+        }
+        if (owned >= MAX_GROUPS_PER_PLAYER) {
+            creator.sendMessage("You have reached your group limit.");
+            return;
+        }
+        long now = System.currentTimeMillis();
+        Long last = createCooldown.get(creator.getUniqueId());
+        if (last != null && now - last < CREATE_COOLDOWN_MS) {
+            creator.sendMessage("Please wait before creating another group.");
+            return;
+        }
         UUID id = UUID.randomUUID();
         String name = GroupWire.clamp(payload.name(), GroupWire.MAX_NAME).trim();
-        Group g = new Group(id, name, creator.getUniqueId());
+        Group g = new Group(id, name, creator.getUniqueId(), now, now);
+        createCooldown.put(creator.getUniqueId(), now);
         g.members.put(creator.getUniqueId(), creator.getName());
         groups.put(id, g);
         log("create | creator=" + creator.getName() + " | " + g);
@@ -488,6 +557,13 @@ final class GroupRegistry {
         }
         UUID me = player.getUniqueId();
         LinkedHashSet<UUID> pending = pendingInvites.get(g.id());
+        Map<UUID, Long> expiry = pendingInviteAt.get(g.id());
+        if (expiry != null && expiry.containsKey(me)
+            && System.currentTimeMillis() > expiry.get(me)) {
+            if (pending != null) pending.remove(me);
+            expiry.remove(me);
+            return;
+        }
         if (g.hasMember(me)) {
             if (pending != null && pending.remove(me)) {
                 save("invite_cleanup");
@@ -535,8 +611,8 @@ final class GroupRegistry {
             log("kick ignored | unknown group");
             return;
         }
-        if (actor == null || !g.hasMember(actor.getUniqueId())) {
-            log("kick denied | not a member | actor=" + name(actor));
+        if (actor == null || g.creator() == null || !g.creator().equals(actor.getUniqueId())) {
+            log("kick denied | actor is not creator | actor=" + name(actor));
             return;
         }
         UUID target = payload.target();
@@ -558,6 +634,7 @@ final class GroupRegistry {
         if (g.members.isEmpty()) {
             groups.remove(g.id());
             pendingInvites.remove(g.id());
+            pendingInviteAt.remove(g.id());
             save("kick_empty");
             log("kick -> group empty, removed | " + g.id());
             return;
@@ -574,12 +651,18 @@ final class GroupRegistry {
         if (!g.hasMember(actor.getUniqueId())) {
             return;
         }
+        if (g.creator() != null && g.creator().equals(actor.getUniqueId())) {
+            actor.sendMessage("Transfer ownership or disband the group before leaving.");
+            log("leave denied | owner must transfer or disband | actor=" + name(actor) + " | " + g);
+            return;
+        }
         g.members.remove(actor.getUniqueId());
         log("leave | actor=" + name(actor) + " | " + g);
         sendEvent(actor, g, KIND_LEFT, g.name());
         if (g.members.isEmpty()) {
             groups.remove(g.id());
             pendingInvites.remove(g.id());
+            pendingInviteAt.remove(g.id());
             save("leave_empty");
             log("leave -> group empty, removed | " + g.id());
             return;
@@ -598,13 +681,14 @@ final class GroupRegistry {
             log("disband denied | not a member | actor=" + name(actor));
             return;
         }
-        // 只有创建者能解散（其它成员请用 group_leave 退出）：避免"任何人一键删掉别人的群"
-        if (g.creator() != null && !g.creator().equals(actor.getUniqueId())) {
+        // creator 缺失/非法时同样拒绝，不能把普通成员当成群主。
+        if (g.creator() == null || !g.creator().equals(actor.getUniqueId())) {
             log("disband denied | actor is not creator | actor=" + name(actor) + " | " + g);
             return;
         }
         groups.remove(g.id());
         pendingInvites.remove(g.id());
+        pendingInviteAt.remove(g.id());
         save("disband");
         log("disband | actor=" + name(actor) + " | " + g);
         for (UUID uuid : g.memberIds()) {
@@ -613,6 +697,72 @@ final class GroupRegistry {
                 sendEvent(p, g, KIND_DISBANDED, g.name());
             }
         }
+    }
+
+    static synchronized void transfer(Player actor, GroupInbound.Transfer payload) {
+        Group g = byId(payload == null ? null : payload.groupId());
+        if (g == null || actor == null) return;
+        if (g.creator() == null || !g.creator().equals(actor.getUniqueId())) return;
+        UUID target = payload.target();
+        if (target == null || target.equals(g.creator()) || !g.hasMember(target)) return;
+        g.creator = target;
+        g.ownerLastSeen = System.currentTimeMillis();
+        pendingInvites.remove(g.id());
+        pendingInviteAt.remove(g.id());
+        save("transfer");
+        log("transfer | actor=" + name(actor) + " | target=" + target + " | " + g);
+        broadcastSync(g);
+    }
+
+    static synchronized void markLogin(Player player) {
+        if (player == null) return;
+        long now = System.currentTimeMillis();
+        boolean changed = false;
+        for (Group g : groups.values()) {
+            if (player.getUniqueId().equals(g.creator()) && g.ownerLastSeen < now) {
+                g.ownerLastSeen = now;
+                changed = true;
+            }
+        }
+        if (changed) save("login");
+    }
+
+    static synchronized int cleanupInactive(long now) {
+        List<Group> removed = new ArrayList<>();
+        for (Group g : new ArrayList<>(groups.values())) {
+            if (g.creator() == null) { log("warn | skip cleanup invalid creator | " + g.id()); continue; }
+            Player online = online(g.creator());
+            if (online != null) { g.ownerLastSeen = now; continue; }
+            if (g.ownerLastSeen > 0 && now - g.ownerLastSeen > OWNER_INACTIVE_MS) removed.add(g);
+        }
+        for (Group g : removed) {
+            groups.remove(g.id());
+            pendingInvites.remove(g.id());
+            pendingInviteAt.remove(g.id());
+            for (UUID uuid : g.memberIds()) {
+                Player p = online(uuid);
+                if (p != null) sendEvent(p, g, KIND_DISBANDED, g.name());
+            }
+            log("cleanup | disband inactive group | " + g);
+        }
+        if (!removed.isEmpty()) save("cleanup");
+        return removed.size();
+    }
+
+    static synchronized boolean adminDelete(String groupId) {
+        Group g = byId(groupId);
+        if (g == null || persistenceReadOnly) return false;
+        groups.remove(g.id());
+        pendingInvites.remove(g.id());
+        pendingInviteAt.remove(g.id());
+        if (groups.size() < MAX_GROUPS) creationDisabled = false;
+        save("admin_delete");
+        for (UUID uuid : g.memberIds()) {
+            Player p = online(uuid);
+            if (p != null) sendEvent(p, g, KIND_DISBANDED, g.name());
+        }
+        log("admin delete | " + g);
+        return true;
     }
 
     /** 转发一条群消息给全体在线成员（**含发送者**）。 */
