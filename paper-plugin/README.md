@@ -197,7 +197,7 @@ $env:JAVA_HOME = 'C:\BianChengJA\JDK\JDK25'   # paper-api 26.x 的 class 主版�
 & 'C:\AI\ds harness\工作区\聊天mod移植1.21.11\gradle-dist\gradle-9.8.2\bin\gradle.bat' --no-daemon --console=plain build
 ```
 
-产物：`build/libs/E33ChatPaper-26.2-3.1.0.jar`（**67,136 字节**，`paper-api` 是 `compileOnly`，不打进 jar）。
+产物：`build/libs/E33ChatPaper-26.2-3.1.0.jar`（**72,608 字节**，`paper-api` 是 `compileOnly`，不打进 jar）。
 
 | 项目 | 值 |
 |---|---|
@@ -205,7 +205,7 @@ $env:JAVA_HOME = 'C:\BianChengJA\JDK\JDK25'   # paper-api 26.x 的 class 主版�
 | `paper-api` 坐标 | `io.papermc.paper:paper-api:26.2.build.135-stable` |
 | `paper-plugin.yml` 的 `api-version` | **`'26.2'`**（26.x 写 `<major>.<minor>`，**不是** `'1.21'`） |
 | 编译工具链 | **JDK 25**（`options.release = 25`；paper-api 的 class 主版本是 69） |
-| 真机验证 | 已在 **Paper 26.2 build 135** 加载通过（插件 3.1.0 enabled + 10 进 6 出通道注册 + 群状态写入/重启读回 `<world>/serverconfig/e33chat-groups.json`） |
+| 真机验证 | 已在 **Paper 26.2 build 135** 加载通过（插件 3.1.0 enabled + 11 进 7 出通道注册 + 群状态写入/重启读回 `<world>/serverconfig/e33chat-groups.json`） |
 
 > 26.x 起版本坐标换了体系：`<mc>.build.<build>-<channel>`，**不再是** `1.21.11-R0.1-SNAPSHOT`。
 > 26.2 / 26.3 / 1.21.11 三份的 `src/main/java` **完全相同**（同一套协议实现），差异只在
@@ -220,7 +220,7 @@ $env:JAVA_HOME = 'C:\BianChengJA\JDK\JDK25'   # paper-api 26.x 的 class 主版�
 2. 服务器日志应出现（4 行：群状态文件路径 + 一行摘要 + 两行完整通道清单）：
    ```
    [E33Chat] group store file = C:\...\world\serverconfig\e33chat-groups.json
-   [E33Chat] E33ChatPaper enabled | in=10 | out=6 | dedupeWindow=10000ms | mentions=on(AsyncChatEvent) | groups=on(persisted, invites=pending) | actions=on(verbs=8, scopes=public/group/private)
+   [E33Chat] E33ChatPaper enabled | in=11 | out=7 | dedupeWindow=10000ms | mentions=on(AsyncChatEvent) | groups=on(persisted, invites=pending) | actions=on(verbs=8, scopes=public/group/private)
    [E33Chat] channels in  = e33chat:quote_sync, e33chat:group_create, e33chat:group_message, e33chat:group_invite, e33chat:group_invite_respond, e33chat:group_kick, e33chat:group_leave, e33chat:group_rename, e33chat:group_disband, e33chat:player_action
    [E33Chat] channels out = e33chat:chat_meta, e33chat:group_sync, e33chat:group_message_relay, e33chat:group_event, e33chat:group_invite_event, e33chat:player_action_relay
    ```
@@ -490,7 +490,7 @@ build.gradle / settings.gradle / gradle.properties
 src/main/resources/paper-plugin.yml            # name/version/main/api-version: '26.2'
 src/main/java/com/niuqu/chatbubble/paper/
     E33ChatPaperPlugin.java                    # 入口：通道注册、派发、去重、@提及事件、登录补发
-    E33Channels.java                           # 全部 10 进 6 出通道名（协议常量的唯一出处）
+    E33Channels.java                           # 全部 11 进 7 出通道名（协议常量的唯一出处）
     MentionParser.java                         # @名字 解析（大小写不敏感 / 最长匹配 / 去重）
     McCodec.java                               # 原版线格式复刻：VarInt / string / long / UUID / boolean
     QuoteSyncPayload.java                      # C2S quote_sync 解码（4 字段）
@@ -511,3 +511,12 @@ verify/
     run-verify.ps1                             # 一键跑上面三阶段（ASCII-only，免 BOM 问题）
 ```
 
+
+
+---
+
+## 图片消息（P3，3.2.1）
+
+- 新增 `e33chat:image_message`（C2S）与 `e33chat:image_message_relay`（S2C）：客户端最多 9 张图 + 文字说明放入一条载荷，插件按 scope 转发给公屏 / 群聊 / 私聊范围内的其他在线玩家。
+- 与 Fabric 客户端字段顺序、UUID/String 编码逐字节一致；旧客户端或旧插件自动回退文本分条。
+- 插件只中继消息，不上传/保存图片；图片 URL 仍由客户端上传到服务端媒体（Fabric）或第三方图床（Paper）。

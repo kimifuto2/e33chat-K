@@ -17,6 +17,8 @@ import com.niuqu.chatbubble.network.GroupMessageRelayPayload;
 import com.niuqu.chatbubble.network.GroupRenamePayload;
 import com.niuqu.chatbubble.network.GroupSyncPayload;
 import com.niuqu.chatbubble.network.GroupWire;
+import com.niuqu.chatbubble.network.ImageMessagePayload;
+import com.niuqu.chatbubble.network.ImageMessageRelayPayload;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -553,6 +555,35 @@ public final class GroupRegistry {
         log("message | from=" + sender.getName().getString() + " | " + g
             + " | recipients=" + n + " | hash=" + msgHash
             + " | preview=" + preview(content));
+    }
+
+    /** P2：把一条图片消息转发给群内**其他**在线成员（发送者本地回显）。 */
+    public static synchronized void relayImage(MinecraftServer server, ServerPlayer sender,
+                                               ImageMessagePayload payload) {
+        Group g = byId(payload == null ? null : payload.groupId());
+        if (g == null) { log("image ignored | unknown group | group=" + (payload == null ? "null" : payload.groupId())); return; }
+        if (sender == null || !g.hasMember(sender.getUUID())) {
+            log("image denied | not a member | sender=" + name(sender) + " | " + g); return;
+        }
+        String content = GroupWire.clamp(payload.content(), ImageMessagePayload.MAX_CONTENT);
+        if (content.isBlank()) return;
+        String msgHash = GroupWire.clamp(payload.msgHash(), 64);
+        if (msgHash.isEmpty() || !msgHash.chars().allMatch(c -> (c >= '0' && c <= '9') || c == '-')) {
+            msgHash = String.valueOf(content.hashCode());
+        }
+        ImageMessageRelayPayload relay = new ImageMessageRelayPayload(
+            ImageMessagePayload.SCOPE_GROUP, g.id.toString(), sender.getUUID(),
+            sender.getName().getString(), content, msgHash);
+        int n = 0;
+        for (UUID uuid : g.members.keySet()) {
+            if (uuid.equals(sender.getUUID())) continue;
+            ServerPlayer p = server.getPlayerList().getPlayer(uuid);
+            if (p == null) continue;
+            try { ServerPlayNetworking.send(p, relay); n++; }
+            catch (Throwable t) { log("image relay failed | player=" + p.getName().getString() + " | " + t); }
+        }
+        log("image | from=" + sender.getName().getString() + " | " + g
+            + " | recipients=" + n + " | hash=" + msgHash);
     }
 
     /** 登录补发：把该玩家所属的全部群逐个同步下去（客户端因此不需要本地保存成员表）。 */

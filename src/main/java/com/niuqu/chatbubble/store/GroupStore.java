@@ -14,6 +14,7 @@ import com.niuqu.chatbubble.network.GroupKickPayload;
 import com.niuqu.chatbubble.network.GroupLeavePayload;
 import com.niuqu.chatbubble.network.GroupMessagePayload;
 import com.niuqu.chatbubble.network.GroupMessageRelayPayload;
+import com.niuqu.chatbubble.network.ImageMessageRelayPayload;
 import com.niuqu.chatbubble.network.GroupRenamePayload;
 import com.niuqu.chatbubble.network.GroupSyncPayload;
 import com.niuqu.chatbubble.network.GroupWire;
@@ -432,6 +433,17 @@ public final class GroupStore {
                 ChatMessageStore.debugLog(() -> "[e33chat] group message muted by DND | group=" + id);
             }
         }
+    }
+
+    /** P2：接收一条群图片消息；复用群消息落库/未读逻辑。 */
+    public static void receiveImage(ImageMessageRelayPayload payload) {
+        if (payload == null || !payload.isValid()) return;
+        java.util.UUID gid;
+        try { gid = java.util.UUID.fromString(payload.groupId()); } catch (Throwable t) { return; }
+        ChatMessageStore.addGroupMessage(gid, payload.senderUUID(),
+            net.minecraft.network.chat.Component.literal(payload.senderName()),
+            ChatMessageStore.renderContent(payload.content()),
+            payload.senderName(), false, payload.msgHash());
     }
 
     /** 这条群消息是否 @ 了**我自己**（免打扰群里 @ 仍然弹横幅的唯一判据）。

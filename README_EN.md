@@ -88,7 +88,7 @@ E33Chat is a chat-enhancement mod that rebuilds the vanilla chat HUD in a chat-a
 - 👥 **Whisper sidebar** — Online player list, click a name to whisper; bouncing unread dot; separate whisper banner + sound; public / whisper split view
 - 🔍 **Chat search** — Real-time matching of message content and sender name, jump with up / down, Chinese supported
 - 😊 **Emoji & kaomoji** — Emoji panel + kaomoji picker, inserted at the cursor
-- 🖼️ **Image messages & viewer** — Up to 9 images per message with an optional caption, preview/remove and server-media or third-party fallback; double-click an image for a fullscreen viewer with cursor-anchored zoom, drag-pan, save / open in browser, and a 2048px hi-res cache
+- 🖼️ **Image messages & viewer** — Up to 9 images per message with an optional caption, preview/remove and server-media or third-party fallback; double-click an image for a fullscreen viewer with cursor-anchored zoom, drag-pan, save / open in browser, and a 2048px hi-res cache; the optional `image_message` protocol sends all 9 images in one payload on Fabric servers and Paper (text fallback for old servers)
 - 📌 **Quick phrases** — Save common phrases and fill them with one click
 - 📋 **Copy & quote reply** — Right-click a message to copy or quote-reply
 - 👤 **Head actions** — Right-click a head to whisper / teleport / block, left-click to @

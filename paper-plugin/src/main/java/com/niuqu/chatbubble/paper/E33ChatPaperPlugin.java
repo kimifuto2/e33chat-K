@@ -253,6 +253,18 @@ public final class E33ChatPaperPlugin extends JavaPlugin implements PluginMessag
                 handlePlayerAction(player, message);
                 return;
             }
+            if (E33Channels.IMAGE_MESSAGE.equals(channel)) {
+                ImageMessageWire.Inbound payload = ImageMessageWire.decode(message);
+                if (!payload.isValid()) {
+                    getLogger().info("[E33Chat] image_message ignored | invalid payload | player="
+                        + safeName(player));
+                    return;
+                }
+                getLogger().info("[E33Chat] image_message recv | player=" + safeName(player)
+                    + " | scope=" + payload.scope() + " | len=" + payload.content().length());
+                ImageMessageRelay.handle(this, player, payload);
+                return;
+            }
             handleGroup(channel, player, message);
         } catch (Throwable t) {
             getLogger().warning("[E33Chat] " + channel + " dropped | player=" + safeName(player)

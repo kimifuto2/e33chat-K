@@ -18,7 +18,7 @@ import java.util.List;
  *       不注册的话 {@code Player#sendPluginMessage} 会直接抛 {@link IllegalArgumentException}。</li>
  * </ul>
  *
- * <p>注意 Paper 的通道数量上限：本插件 10 进 6 出，加上客户端自带模组的通道声明，
+ * <p>注意 Paper 的通道数量上限：本插件 11 进 7 出，加上客户端自带模组的通道声明，
  * 大型整合包可能触到 Paper 的限制（{@code Invalid custom payload payload!} 踢人），
  * 需要服务端加 {@code -Dpaper.disableChannelLimit=true}（见 README）。
  */
@@ -66,18 +66,22 @@ final class E33Channels {
     static final String PLAYER_ACTION = "e33chat:player_action";
     static final String PLAYER_ACTION_RELAY = "e33chat:player_action_relay";
 
+    /** P3：图片消息（C2S）与转发（S2C，必须与客户端 ImageMessageRelayPayload 一致）。 */
+    static final String IMAGE_MESSAGE = "e33chat:image_message";
+    static final String IMAGE_MESSAGE_RELAY = "e33chat:image_message_relay";
+
     /** 需要 {@code registerIncomingPluginChannel} 的全部通道（C2S）。 */
     static final List<String> INCOMING = List.of(
         QUOTE_SYNC,
         GROUP_CREATE, GROUP_MESSAGE, GROUP_INVITE, GROUP_INVITE_RESPOND,
         GROUP_KICK, GROUP_LEAVE, GROUP_RENAME, GROUP_DISBAND,
-        PLAYER_ACTION);
+        PLAYER_ACTION, IMAGE_MESSAGE);
 
     /** 需要 {@code registerOutgoingPluginChannel} 的全部通道（S2C）。 */
     static final List<String> OUTGOING = List.of(
         CHAT_META,
         GROUP_SYNC, GROUP_MESSAGE_RELAY, GROUP_EVENT, GROUP_INVITE_EVENT,
-        PLAYER_ACTION_RELAY);
+        PLAYER_ACTION_RELAY, IMAGE_MESSAGE_RELAY);
 
     /** 是否是本插件关心的上行通道（其余通道一律忽略）。 */
     static boolean isIncoming(String channel) {
