@@ -1,6 +1,8 @@
 package com.niuqu.chatbubble.mixin;
 
+import com.niuqu.chatbubble.ChatBubbleScreen;
 import com.niuqu.chatbubble.render.Appearance;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.widget.TextFieldWidget;
@@ -73,5 +75,21 @@ public abstract class TextFieldWidgetSelectionMixin {
             target = "Lnet/minecraft/client/gui/DrawContext;drawSelection(IIIIZ)V"))
     private void e33chat$skipVanillaSelection(DrawContext context, int x1, int y1, int x2, int y2, boolean invert) {
         // 选中背景已在 HEAD 用主题色画好，这里吞掉原版的反色 + 加色叠加层
+    }
+
+    /**
+     * 补全预览后缀（TextFieldWidget 内部用 String drawText 画）原版硬编码灰色；
+     * 当光标位于文本中间时，右侧预览会被看成“光标后的正文变灰”。这里在聊天屏内
+     * 把它改成主题主文字色，与正文一致。
+     */
+    @Redirect(method = "renderWidget",
+        at = @At(value = "INVOKE",
+            target = "Lnet/minecraft/client/gui/DrawContext;drawText(Lnet/minecraft/client/font/TextRenderer;Ljava/lang/String;IIIZ)V"))
+    private void e33chat$suggestionPrimaryColor(DrawContext context, TextRenderer textRenderer,
+                                                String text, int x, int y, int color, boolean shadow) {
+        if (MinecraftClient.getInstance().currentScreen instanceof ChatBubbleScreen) {
+            color = 0xFF000000 | (Appearance.snapshot().textPrimary() & 0xFFFFFF);
+        }
+        context.drawText(textRenderer, text, x, y, color, shadow);
     }
 }

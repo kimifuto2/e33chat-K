@@ -1,7 +1,7 @@
 # E33Chat · Minecraft 1.21.11 Fabric 版
 
 > **本分支：`main` · Minecraft 1.21.11（稳定线）**
-> 产物：**`e33chat-Fabric-1.21.11-3.2.1.jar`**（765,001 字节 / ≈747 KiB） · 模组版本 **3.2.1**
+> 产物：**`e33chat-Fabric-1.21.11-3.2.1.jar`**（765,415 字节 / ≈747 KiB） · 模组版本 **3.2.1**
 >
 > 本轮 3.2.1 审查修补：图片载荷 8192；群聊仅群主邀请/踢人、群主可转让、群主 60 天未登录自动解散；服务器 `/e33chat group list|delete` 管理命令；媒体上传会话/配额加固；网络解码上限；Paper 超 4096 群不截断、读取失败只读；群/服务端配置原子写。
 > 仓库：[kimifuto2/e33chat-K](https://github.com/kimifuto2/e33chat-K) · 上游：[E33EPUS/E33Chat](https://github.com/E33EPUS/E33Chat)（MIT）
@@ -16,9 +16,9 @@
 
 | 分支 | Minecraft | 定位 | 产物 jar（各分支最新） | 大小 |
 |---|---|---|---|---|
-| **`main`**（本分支） | 1.21.11 | 稳定线 | `e33chat-Fabric-1.21.11-3.2.1.jar` | 765,001 B |
-| `mc26.3` | 26.3 | 26.x 移植线 | `e33chat-Fabric-26.3-3.2.1.jar` | 767,493 B |
-| `mc26.2` | 26.2 | 26.x 移植线 | `e33chat-Fabric-26.2-3.2.1.jar` | 767,517 B |
+| **`main`**（本分支） | 1.21.11 | 稳定线 | `e33chat-Fabric-1.21.11-3.2.1.jar` | 765,415 B |
+| `mc26.3` | 26.3 | 26.x 移植线 | `e33chat-Fabric-26.3-3.2.1.jar` | 767,632 B |
+| `mc26.2` | 26.2 | 26.x 移植线 | `e33chat-Fabric-26.2-3.2.1.jar` | 767,656 B |
 
 > 三个分支都在 **<https://github.com/kimifuto2/e33chat-K>** 下。`mc26.3` / `mc26.2` 是 **26.x 移植线**（Mojang 年份版本号），构建链与 1.21.11 差异很大（Java 25 / Gradle 9.8+ / Loom 1.19.3 / 不再混淆），详见对应分支 README 的「26.x 移植说明」；**本分支（`main`）只针对 1.21.11**。
 
@@ -272,7 +272,7 @@ java.lang.IllegalStateException: Cannot register channel. Too many channel regis
 
 | 文件 | 大小 |
 |---|---|
-| `build/libs/e33chat-Fabric-1.21.11-3.2.1.jar` | 765,001 B |
+| `build/libs/e33chat-Fabric-1.21.11-3.2.1.jar` | 765,415 B |
 | `build/libs/e33chat-Fabric-1.21.11-3.2.1-sources.jar` | 524,296 B |
 
 ---
@@ -304,14 +304,13 @@ java.lang.IllegalStateException: Cannot register channel. Too many channel regis
 
 ### 群聊（MVP）的限制
 
-- **所有群成员都必须装 E33Chat**，且服务端必须是 **Fabric + 本模组**；Paper / 原版服务端没有群聊后端
-  （属于预期，不是 bug）。Paper 客户端仍可用聊天本体，但「+」按钮会提示不可用
+- **所有群成员都必须装 E33Chat**；服务端用 **Fabric + 本模组**，或安装本仓库的 **Paper 插件**（Paper 插件同样中继群聊）。原版服务端没有群聊后端
 - **群状态按世界保存**在 `<世界>/serverconfig/e33chat-groups.json`（服务端内存里是唯一事实来源）。
   换世界 = 换一套群；同一服务端多世界之间不共享
 - **离线成员收不到群消息**（无离线补发/离线红点）；重新上线后只补发「群快照」，不补历史消息
 - 群消息的**引用块只在发送者本机可见**（服务端不解析群消息内容）；图片/表情/贴图链接照常转发
 - 群人数上限 64（协议 `GroupWire.MAX_LIST`）；群名最长 32 字符、单条消息 512 字符
-- 权限（按角色）：**邀请 / 解散只有创建者**；**改名 / 踢人对所有成员开放**（但任何人都不能踢创建者）
+- 权限（按角色）：**邀请 / 踢人 / 转让 / 解散只有群主**；**群主和普通群员都能改名**；群主不能被踢，群主不能普通退出（必须先转让或解散）
 - 客户端不落盘群成员表（以服务端快照为准），所以**必须连上带本模组的服务端**才看得到群
 
 ---

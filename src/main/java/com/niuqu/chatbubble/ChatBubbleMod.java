@@ -473,7 +473,7 @@ public class ChatBubbleMod implements ModInitializer {
             whisperTemplates = List.of();
             lastGroupCleanupAt = 0L;
             try {
-                com.niuqu.chatbubble.server.GroupRegistry.reset();
+                com.niuqu.chatbubble.server.GroupRegistry.shutdown();
             } catch (Throwable ignored) {
             }
         });

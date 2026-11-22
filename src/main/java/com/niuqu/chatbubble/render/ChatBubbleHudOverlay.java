@@ -157,9 +157,10 @@ public class ChatBubbleHudOverlay {
     }
 
 
-    /** 左下角提示（图标 / [按键] / 红点）统一取当前主题的强调色。 */
+    /** 左下角图标与 [按键] 提示取主题的主文字色；浅色主题用它自己的深色，
+     *  不再复用 quoteBar（米色主题的 quoteBar 偏橙，会与橙色主题撞色）。 */
     private static int hintColor() {
-        return 0xFF000000 | (c().quoteBar() & 0xFFFFFF);
+        return 0xFF000000 | (c().nameColor() & 0xFFFFFF);
     }
 
     private static void drawIcon(DrawContext g, int x, int y) {
@@ -170,6 +171,6 @@ public class ChatBubbleHudOverlay {
     private static void drawScaledTip(DrawContext g, int x, int y, int disp) {
         Identifier tex = ChatBubbleScreen.iconTex("private_tip");
         ColoredTextureRenderer.drawTinted(g, tex, x, y, disp, disp,
-            SRC_U, SRC_V, SRC_S, SRC_S, 16, 16, hintColor());
+            SRC_U, SRC_V, SRC_S, SRC_S, 16, 16, 0xFFFFFFFF);
     }
 }

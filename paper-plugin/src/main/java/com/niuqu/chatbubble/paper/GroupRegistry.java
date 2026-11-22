@@ -19,8 +19,8 @@ import java.util.UUID;
  * <p>职责：
  * <ul>
  *   <li>保存「群 = id + 名字 + 成员表（按入群顺序、带名字，离线成员也能显示昵称）+ 创建者」；</li>
- *   <li>校验每个 C2S 操作：发送者必须是群成员；**邀请与解散只有创建者能做**，
- *       改名/踢人所有成员可做，但**创建者不可被踢**；任何异常只记日志、绝不抛到网络层；</li>
+ *   <li>校验每个 C2S 操作：**邀请/踢人/转让/解散只有群主能做**，
+ *       改名所有成员可做；**群主不可被踢、不能普通退出**；任何异常只记日志、绝不抛到网络层；</li>
  *   <li>变更以 {@code group_sync} 广播给全体**在线**成员；消息以 {@code group_message_relay}
  *       转发给全体在线成员（**含发送者**，客户端按 msgHash 去重）；</li>
  *   <li>玩家登录时把他的全部群逐个补发（客户端不需要自己持久化成员表）。</li>
@@ -237,19 +237,33 @@ final class GroupRegistry {
         try {
             GroupStore.Snapshot snapshot = s.read();
             for (Group g : snapshot.groups) {
+                if (g.creator() == null || !g.hasMember(g.creator())) {
+                    log("warn | invalid creator not in members | id=" + g.id() + " | creator=" + g.creator());
+                    g.creator = null;
+                }
                 groups.put(g.id(), g);
+            }
+            if (snapshot.damaged) {
+                persistenceReadOnly = true;
+                log("read-only | group file contains damaged records | file=" + s.file());
             }
             creationDisabled = snapshot.overLimit || groups.size() > MAX_GROUPS;
             if (creationDisabled) {
                 log("warn | group count over limit | groups=" + groups.size());
             }
-            if (snapshot.migrated && !persistenceReadOnly) save("migration");
             // pending 里只保留「群还在」的条目，避免手改文件留下野条目
             for (Map.Entry<UUID, LinkedHashSet<UUID>> entry : snapshot.pending.entrySet()) {
                 if (groups.containsKey(entry.getKey()) && !entry.getValue().isEmpty()) {
                     pendingInvites.put(entry.getKey(), entry.getValue());
+                    // GroupStore 目前只持久化目标 UUID；重启后给恢复的邀请一个完整的新 TTL，
+                    // 避免“缺少过期字段 = 永不过期”。下一次保存会带上当前状态。
+                    Map<UUID, Long> expiry = pendingInviteAt.computeIfAbsent(
+                        entry.getKey(), k -> new LinkedHashMap<>());
+                    long until = System.currentTimeMillis() + PENDING_INVITE_TTL_MS;
+                    for (UUID target : entry.getValue()) expiry.putIfAbsent(target, until);
                 }
             }
+            if (snapshot.migrated && !persistenceReadOnly) save("migration");
             if (snapshot.groups.isEmpty() && groups.isEmpty()) {
                 log("store ready (no file yet) | pending=" + pendingCount() + " | file=" + s.file());
             } else {
@@ -273,7 +287,7 @@ final class GroupRegistry {
      */
     private static void save(String reason) {
         GroupStore s = store;
-        if (s == null) {
+        if (s == null || persistenceReadOnly) {
             return;
         }
         try {

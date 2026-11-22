@@ -110,6 +110,7 @@ final class GroupStore {
         final Map<UUID, LinkedHashSet<UUID>> pending = new LinkedHashMap<>();
         boolean overLimit;
         boolean migrated;
+        boolean damaged;
     }
 
     // ================================================================ 读
@@ -159,6 +160,8 @@ final class GroupStore {
                 GroupRegistry.Group group = readGroup(groupMap);
                 if (group != null) {
                     snap.groups.add(group);
+                } else {
+                    snap.damaged = true;
                 }
             }
             if (snap.groups.size() > MAX_GROUPS) {

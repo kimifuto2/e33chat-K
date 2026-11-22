@@ -50,7 +50,7 @@ import java.util.UUID;
  * <p>职责：
  * <ul>
  *   <li>保存「群 = 名字 + 成员表（按入群顺序）」；成员表带名字，离线成员也能显示昵称。</li>
- *   <li>校验每个 C2S 操作（发送者必须在群里；踢人还要「目标不是创建者」），
+ *   <li>校验每个 C2S 操作（邀请/踢人/转让/解散只有群主；改名允许所有成员；群主不可被踢、不能普通退出），
  *       任何异常只记日志、**绝不影响连接**（调用方全 try/catch）。</li>
  *   <li>把变更以 {@link GroupSyncPayload} 广播给全体在线成员；把消息以
  *       {@link GroupMessageRelayPayload} 转发给全体在线成员（含发送者，客户端按 msgHash 去重）。</li>
@@ -73,8 +73,8 @@ import java.util.UUID;
  *       给自己发 INVITED 事件），拒绝只回执给创建者，群不变。</li>
  *   <li>**只有创建者能邀请**（{@link #invite} 里校验 sender == creator），普通成员无邀请权；
  *       违规请求回一条 {@link GroupEventPayload#KIND_INVITE_DENIED} 回执，群与其状态都不动。</li>
- *   <li>pendingInvites 是**纯内存态**：服务端重启即丢（被邀请者拿不到按钮响应 = 邀请失效），
- *       这是 MVP 可接受的取舍（需求明确允许）；被邀请者离线时直接忽略，不排离线队列。</li>
+ *   <li>pendingInvites 在 Fabric 侧是内存态，10 分钟过期；Paper 侧会落盘，重启恢复时
+ *       重新给予一个完整 TTL。被邀请者离线时直接忽略，不排离线队列。</li>
  * </ul>
  */
 public final class GroupRegistry {
@@ -160,6 +160,12 @@ public final class GroupRegistry {
         }
     }
 
+    /** 服务器停止：先保存再清空，确保 cleanupInactive 更新的 ownerLastSeen 落盘。 */
+    public static synchronized void shutdown() {
+        saveToDisk();
+        reset();
+    }
+
     /** 服务器停止：清空内存态，让下一个世界按自己的文件重新加载。 */
     public static synchronized void reset() {
         groups.clear();
@@ -214,12 +220,19 @@ public final class GroupRegistry {
                     }
                     if (g.members.isEmpty()) {
                         log("warn | skip empty group | id=" + id);
+                        persistenceReadOnly = true;
                         continue;
                     }
-                    if (creator == null) log("warn | group has invalid creator | id=" + id);
+                    if (creator == null || !g.members.containsKey(creator)) {
+                        // 不自动猜测新群主：标记为无效群，交给服务器管理员处理。
+                        log("warn | invalid creator not in members | id=" + id + " | creator=" + creator);
+                        g.creator = null;
+                    }
                     groups.put(id, g);
-                } catch (Throwable ignored) {
-                    // 单条损坏只丢这个群
+                } catch (Throwable t) {
+                    // 单条损坏：记录 ID 并进入只读，避免后续保存把原文件覆盖成“只剩好群”。
+                    log("warn | corrupt group record | id=" + (m.get("id")) + " | " + t);
+                    persistenceReadOnly = true;
                 }
             }
             if (groups.size() > MAX_GROUPS) log("warn | group count exceeds limit | groups=" + groups.size());

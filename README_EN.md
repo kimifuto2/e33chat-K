@@ -131,7 +131,7 @@ E33Chat is a chat-enhancement mod that rebuilds the vanilla chat HUD in a chat-a
 
 ## Group chat
 
-> Group chat is **relayed by the server**: the server keeps the groups and forwards messages, the client never connects peer-to-peer. It therefore needs E33Chat installed on the server as well (Fabric server mod; the Paper plugin has no group backend yet). Everyone in a group must run E33Chat.
+> Group chat is **relayed by the server**: the server keeps the groups and forwards messages, the client never connects peer-to-peer. It therefore needs E33Chat installed on the server as well (Fabric server mod or the bundled Paper plugin). Everyone in a group must run E33Chat.
 
 - **Create** — the **`+`** button next to the sidebar search box opens a centered "New group" panel: group name (optional, falls back to `【Group】`), a tick-list of online players, then *Done* / *Cancel*
 - **Invite → accept / decline** — ticked players get a `X invited you to the group 【name】` banner plus an in-conversation row with **Accept** / **Decline** buttons; the creator is notified either way
@@ -151,7 +151,7 @@ E33Chat is a chat-enhancement mod that rebuilds the vanilla chat HUD in a chat-a
 - Actions render as a **centered system line** — `A pats B: text` — with no bubble, no banner, no sound and by default no de-duplication
 - The audience follows the **current conversation**: public → whole server, group → that group's members, whisper → just the two of you; actions never leak into another view
 - With the server mod installed the verb text is taken from a server-side table, so a client cannot forge verbs; without the server mod an action is sent as ordinary chat and the receiving clients re-render it as the same system line (known verbs only, so normal chat is never affected)
-- Paper servers do not relay actions yet — they take the plain-chat fallback path
+- Paper servers relay group chat via the bundled plugin; player actions still take the plain-chat fallback path
 
 ---
 
@@ -312,7 +312,7 @@ An empty template list disables templates and falls back to the guards — every
     - A decoration containing a separator (e.g. a colon in a title) may truncate the name — change the separator or reorder the template
     - A completely unknown new player (never seen online) whispering cannot resolve the name and falls back to the guards
     - `{prefix}` adjacent to `{display_name}` without an anchor is absorbed into the display name (same behavior as the guard path)
-11. Group chat is server-relayed and needs E33Chat on the server too — **Paper servers are not supported yet** (they have no group backend and do not relay actions)
+11. Group chat is server-relayed and needs E33Chat on the server too — Fabric servers can use this mod, and Paper servers can use the bundled Paper plugin (it relays group chat as well)
 12. Custom channels are declared during the configuration phase, so the **first** connection to a remote E33Chat server does not have group chat yet; reconnect once and it works (single-player / LAN / localhost work on the first join)
 
 ---
