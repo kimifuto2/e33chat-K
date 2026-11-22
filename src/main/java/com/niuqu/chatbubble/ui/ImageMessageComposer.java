@@ -42,7 +42,8 @@ public final class ImageMessageComposer {
     public boolean addUrl(String url) {
         if (url == null || isFull()) return false;
         String u = url.trim();
-        if (!(u.startsWith("http://") || u.startsWith("https://"))) return false;
+        if (!(u.startsWith("http://") || u.startsWith("https://")
+                || u.startsWith("e33chat://media/"))) return false;
         if (remoteUrls.contains(u) || files.stream().anyMatch(f -> u.equals(f.getPath()))) return false;
         remoteUrls.add(u);
         return true;
