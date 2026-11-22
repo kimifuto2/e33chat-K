@@ -3950,8 +3950,8 @@ boolean showAvatar = !(ChatBubbleClientSetup.config().hideRepeatedAvatars() != n
         if (msg.replyContent() != null) {
             int quoteMaxW = panelW - PAD * 2 - Appearance.avatarSize() - 24;
             String quoteText = "↳ " + msg.replySender() + ": " + msg.replyContent();
-            String quoteDisplay = textRenderer.trimToWidth(quoteText, Math.max(8, (int)((quoteMaxW - 10) / s)));
-            if (!quoteDisplay.equals(quoteText)) quoteDisplay += "...";
+            // 省略号必须算进可用宽度：先 trim 再拼 "..." 会让文本比底框宽 3 个点。
+            String quoteDisplay = ellipsize(quoteText, Math.max(8, (int)((quoteMaxW - 8 * s) / s)));
             int quoteTextW = (int)(textRenderer.getWidth(quoteDisplay) * s);
             int quoteW = Math.min(quoteTextW + (int)(8 * s), quoteMaxW);
             int quoteH = Math.max(1, (int)((textRenderer.fontHeight + 4) * s));
@@ -4165,8 +4165,8 @@ boolean showAvatar = !(ChatBubbleClientSetup.config().hideRepeatedAvatars() != n
         if (msg.replyContent() != null) {
             int quoteMaxW = panelW - PAD * 2 - Appearance.avatarSize() - 24;
             String quoteText = "↳ " + msg.replySender() + ": " + msg.replyContent();
-            String quoteDisplay = textRenderer.trimToWidth(quoteText, quoteMaxW - 10);
-            if (!quoteDisplay.equals(quoteText)) quoteDisplay += "...";
+            // 省略号必须算进可用宽度：先 trim 再拼 "..." 会让文本比底框宽 3 个点。
+            String quoteDisplay = ellipsize(quoteText, quoteMaxW - 8);
             int quoteW = Math.min(textRenderer.getWidth(quoteDisplay) + 8, quoteMaxW);
             int quoteX = own ? (avatarX - UiTokens.AVATAR_NAME_GAP - quoteW) : (avatarX + Appearance.avatarSize() + UiTokens.AVATAR_GAP);
             if (quoteX < panelX + PAD) quoteX = panelX + PAD;
