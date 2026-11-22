@@ -657,10 +657,20 @@ public final class PublicChatOverlay {
 
     /** 正文去掉图片/表情括号码（[[CICode,...]] 之类），并把换行压成空格。 */
     private static String cleanBody(ChatMessage m) {
-        Text body = m.content() == null ? Text.empty() : BracketCodec.parse(m.content()).textWithoutImages();
-        String s = stripSection(body.getString()).replace('\n', ' ').trim();
-        // 纯图片/表情消息剥完只剩空串：给个 [图片] 占位，避免小窗里只显示一个名字
-        return s.isEmpty() ? Text.translatable("e33chat.image.placeholder").getString() : s;
+        if (m.content() == null) return "";
+        BracketCodec.ParseResult parsed = BracketCodec.parse(m.content());
+        String s = stripSection(parsed.textWithoutImages().getString()).replace('\n', ' ').trim();
+        if (parsed.images().isEmpty()) return s;
+        // 小窗里图片不能直接绘制：按图片数量输出占位标识，而不是不管几张图都只给一个 [图片]。
+        // 有说明文字时保留说明（如「111 [图片] [图片]」），避免小窗只剩占位符、看不到 caption。
+        String mark = Text.translatable("e33chat.image.placeholder").getString();
+        StringBuilder out = new StringBuilder(s);
+        int n = Math.min(parsed.images().size(), 9);
+        for (int i = 0; i < n; i++) {
+            if (out.length() > 0) out.append(' ');
+            out.append(mark);
+        }
+        return out.toString();
     }
 
     private static String stripSection(String s) {

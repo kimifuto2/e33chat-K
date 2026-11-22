@@ -24,6 +24,9 @@ public class ChatInputSuggestorMixin {
 
     @Shadow @Final private Screen owner;
 
+    @Shadow private int x;
+    @Shadow private int width;
+
     /** 原版命令高亮里「未被参数占用的文字」用的灰色样式（Formatting.GRAY）。 */
     @Shadow @Final private static Style INFO_STYLE;
 
@@ -74,7 +77,12 @@ public class ChatInputSuggestorMixin {
             target = "Lnet/minecraft/client/gui/DrawContext;drawTextWithShadow(Lnet/minecraft/client/font/TextRenderer;Lnet/minecraft/text/OrderedText;III)V"))
     private void e33chat$noShadowHint(DrawContext context, TextRenderer textRenderer, OrderedText text,
                                       int x, int y, int color) {
-        context.drawText(textRenderer, text, x, y, color, false);
+        // 用法/报错提示整行居中在底框里，而不是贴左边缘。
+        int drawX = x;
+        if (owner instanceof ChatBubbleScreen) {
+            drawX = x + (width - textRenderer.getWidth(text)) / 2;
+        }
+        context.drawText(textRenderer, text, drawX, y, color, false);
     }
 
     @Inject(method = "show(Z)V", at = @At("TAIL"))
