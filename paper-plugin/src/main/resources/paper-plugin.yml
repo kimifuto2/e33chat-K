@@ -1,5 +1,5 @@
 name: E33ChatPaper
-version: '3.1.0'
+version: '3.2.2'
 main: com.niuqu.chatbubble.paper.E33ChatPaperPlugin
 api-version: '1.21'
 description: E33Chat server-side bridge for Paper - relays quote_sync/chat_meta, group chat (group_*) and player actions (player_action) so Fabric clients work together without the mod on the server.
