@@ -17,6 +17,7 @@ import com.niuqu.chatbubble.network.GroupMessageRelayPayload;
 import com.niuqu.chatbubble.network.ImageMessageRelayPayload;
 import com.niuqu.chatbubble.network.GroupRenamePayload;
 import com.niuqu.chatbubble.network.GroupSyncPayload;
+import com.niuqu.chatbubble.network.GroupTransferPayload;
 import com.niuqu.chatbubble.network.GroupWire;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.Minecraft;
@@ -550,6 +551,21 @@ public final class GroupStore {
             ClientPlayNetworking.send(new GroupKickPayload(groupId.toString(), target));
         } catch (Throwable t) {
             ChatMessageStore.debugLog("[e33chat] group_kick send failed | " + t);
+        }
+    }
+
+    public static void transfer(UUID groupId, UUID target) {
+        if (groupId == null || target == null) return;
+        if (!available()) {
+            ChatMessageStore.debugLog("[e33chat] group_transfer skipped | server has no group support");
+            return;
+        }
+        try {
+            ClientPlayNetworking.send(new GroupTransferPayload(groupId.toString(), target));
+            ChatMessageStore.debugLog(() -> "[e33chat] group_transfer send | group=" + groupId
+                + " | target=" + target);
+        } catch (Throwable t) {
+            ChatMessageStore.debugLog("[e33chat] group_transfer send failed | " + t);
         }
     }
 

@@ -4,6 +4,7 @@ import com.niuqu.chatbubble.ChatBubbleMod;
 import com.niuqu.chatbubble.chat.TemplateMatcher;
 import com.niuqu.chatbubble.config.ServerConfig;
 import com.niuqu.chatbubble.config.ServerConfigManager;
+import com.niuqu.chatbubble.server.GroupRegistry;
 import com.niuqu.chatbubble.network.ServerConfigScreenPayload;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -69,12 +70,24 @@ public class E33ChatCommands {
                                 IntegerArgumentType.getInteger(ctx, "index"),
                                 StringArgumentType.getString(ctx, "text")))))));
 
+            var group = net.minecraft.commands.Commands.literal("group")
+                .requires(s -> s.permissions().hasPermission(
+                    net.minecraft.server.permissions.Permissions.COMMANDS_GAMEMASTER))
+                .then(net.minecraft.commands.Commands.literal("list")
+                    .executes(ctx -> listGroups(ctx.getSource())))
+                .then(net.minecraft.commands.Commands.literal("delete")
+                    .then(net.minecraft.commands.Commands.argument("groupId", StringArgumentType.word())
+                        .then(net.minecraft.commands.Commands.literal("confirm")
+                            .executes(ctx -> deleteGroup(ctx.getSource(),
+                                StringArgumentType.getString(ctx, "groupId"))))));
+
             dispatcher.register(net.minecraft.commands.Commands.literal("e33chat")
                 .then(net.minecraft.commands.Commands.literal("gui")
                     .requires(s -> s.permissions().hasPermission(
                         net.minecraft.server.permissions.Permissions.COMMANDS_GAMEMASTER))
                     .executes(ctx -> openServerGui(ctx.getSource())))
-                .then(tpl));
+                .then(tpl)
+                .then(group));
         });
     }
 
@@ -226,5 +239,20 @@ public class E33ChatCommands {
             if (!n.isEmpty() && (name.equals(n) || name.contains(n))) return true;
         }
         return false;
+    }
+
+    private static int listGroups(CommandSourceStack src) {
+        for (GroupRegistry.Group g : GroupRegistry.allGroups()) {
+            src.sendSuccess(() -> Component.literal(g.id() + " | " + g.name()
+                + " | owner=" + g.creator() + " | members=" + g.size()), false);
+        }
+        return 1;
+    }
+
+    private static int deleteGroup(CommandSourceStack src, String groupId) {
+        boolean ok = GroupRegistry.adminDelete(src.getServer(), groupId);
+        if (ok) src.sendSuccess(() -> Component.literal("group deleted: " + groupId), false);
+        else src.sendFailure(Component.literal("group not found or store is read-only: " + groupId));
+        return ok ? 1 : 0;
     }
 }

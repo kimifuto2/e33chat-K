@@ -33,6 +33,7 @@ dependencies {
     // WebP emote decoding via TwelveMonkeys ImageIO (picked up by RasterImageDecoder)
     testImplementation platform('org.junit:junit-bom:5.11.4')
     testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 processResources {

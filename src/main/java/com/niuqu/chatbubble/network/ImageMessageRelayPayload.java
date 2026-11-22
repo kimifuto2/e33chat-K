@@ -31,7 +31,7 @@ public record ImageMessageRelayPayload(String scope, String groupId, UUID sender
             GroupWire.writeString(buf, GroupWire.clamp(value.groupId, 64));
             buf.writeUUID(value.senderUUID == null ? new UUID(0, 0) : value.senderUUID);
             GroupWire.writeString(buf, GroupWire.clamp(value.senderName, ImageMessagePayload.MAX_NAME));
-            GroupWire.writeString(buf, GroupWire.clamp(value.content, ImageMessagePayload.MAX_CONTENT));
+            GroupWire.writeString(buf, GroupWire.clamp(value.content, ImageMessagePayload.MAX_CONTENT), ImageMessagePayload.MAX_CONTENT);
             GroupWire.writeString(buf, GroupWire.clamp(value.msgHash, 64));
         },
         buf -> {

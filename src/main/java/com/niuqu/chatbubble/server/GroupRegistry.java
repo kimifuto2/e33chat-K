@@ -16,6 +16,7 @@ import com.niuqu.chatbubble.network.GroupMessagePayload;
 import com.niuqu.chatbubble.network.GroupMessageRelayPayload;
 import com.niuqu.chatbubble.network.GroupRenamePayload;
 import com.niuqu.chatbubble.network.GroupSyncPayload;
+import com.niuqu.chatbubble.network.GroupTransferPayload;
 import com.niuqu.chatbubble.network.GroupWire;
 import com.niuqu.chatbubble.network.ImageMessagePayload;
 import com.niuqu.chatbubble.network.ImageMessageRelayPayload;
@@ -27,7 +28,12 @@ import net.minecraft.world.level.storage.LevelResource;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -76,23 +82,39 @@ public final class GroupRegistry {
 
     /** 群名默认显示值由客户端渲染，这里存空串表示「未命名」。 */
     public static final int MAX_MEMBERS = GroupWire.MAX_LIST;
+    public static final int MAX_GROUPS = 4096;
+    public static final int MAX_GROUPS_PER_PLAYER = 20;
+    public static final long CREATE_COOLDOWN_MS = 10_000L;
+    public static final long OWNER_INACTIVE_MS = 60L * 24 * 60 * 60 * 1000;
+    public static final long PENDING_INVITE_TTL_MS = 10L * 60 * 1000;
+    private static final long MAX_FILE_BYTES = 4L * 1024 * 1024;
 
     /** 一个群：id、名字（空串=未命名）、成员（UUID→名字，LinkedHashMap 保序）、创建者。 */
     public static final class Group {
         final UUID id;
         String name;
         final LinkedHashMap<UUID, String> members = new LinkedHashMap<>();
-        final UUID creator;
+        UUID creator;
+        long createdAt;
+        long ownerLastSeen;
 
         Group(UUID id, String name, UUID creator) {
+            this(id, name, creator, System.currentTimeMillis(), System.currentTimeMillis());
+        }
+
+        Group(UUID id, String name, UUID creator, long createdAt, long ownerLastSeen) {
             this.id = id;
             this.name = name == null ? "" : name;
             this.creator = creator;
+            this.createdAt = createdAt > 0 ? createdAt : System.currentTimeMillis();
+            this.ownerLastSeen = ownerLastSeen > 0 ? ownerLastSeen : this.createdAt;
         }
 
         public UUID id() { return id; }
         public String name() { return name; }
         public UUID creator() { return creator; }
+        public long createdAt() { return createdAt; }
+        public long ownerLastSeen() { return ownerLastSeen; }
         public boolean hasMember(UUID uuid) { return uuid != null && members.containsKey(uuid); }
         public Collection<UUID> memberIds() { return new LinkedHashSet<>(members.keySet()); }
         public int size() { return members.size(); }
@@ -109,6 +131,9 @@ public final class GroupRegistry {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
     private static Path storePath;
     private static boolean loaded;
+    private static boolean persistenceReadOnly;
+    private static final Map<UUID, Long> createCooldown = new LinkedHashMap<>();
+    private static final Map<UUID, Map<UUID, Long>> pendingInviteAt = new LinkedHashMap<>();
 
     private static void log(String msg) {
         LogUtils.getLogger().info("[e33chat] srv | group | " + msg);
@@ -120,9 +145,15 @@ public final class GroupRegistry {
     public static synchronized void ensureLoaded(MinecraftServer server) {
         if (loaded) return;
         loaded = true;
+        persistenceReadOnly = false;
         try {
             storePath = server.getWorldPath(LevelResource.ROOT)
                 .resolve("serverconfig").resolve("e33chat-groups.json");
+            if (Files.exists(storePath) && Files.size(storePath) > MAX_FILE_BYTES) {
+                persistenceReadOnly = true;
+                log("read-only | group store exceeds " + MAX_FILE_BYTES + " bytes | file=" + storePath);
+                return;
+            }
             loadFromDisk();
         } catch (Throwable t) {
             log("load failed | " + t);
@@ -133,7 +164,10 @@ public final class GroupRegistry {
     public static synchronized void reset() {
         groups.clear();
         pendingInvites.clear();
+        pendingInviteAt.clear();
+        createCooldown.clear();
         loaded = false;
+        persistenceReadOnly = false;
         storePath = null;
     }
 
@@ -144,7 +178,12 @@ public final class GroupRegistry {
             Map<String, Object> root = GSON.fromJson(r, new TypeToken<Map<String, Object>>() {}.getType());
             if (root == null) return;
             Object listObj = root.get("groups");
-            if (!(listObj instanceof List<?> list)) return;
+            boolean migrated = false;
+            if (!(listObj instanceof List<?> list)) {
+                persistenceReadOnly = true;
+                log("read-only | group store root has no groups array | file=" + storePath);
+                return;
+            }
             for (Object o : list) {
                 if (!(o instanceof Map<?, ?> m)) continue;
                 try {
@@ -155,7 +194,11 @@ public final class GroupRegistry {
                         creator = UUID.fromString(String.valueOf(m.get("creator")));
                     } catch (Throwable ignored) {
                     }
-                    Group g = new Group(id, name, creator);
+                    boolean missingTimestamp = m.get("createdAt") == null || m.get("ownerLastSeen") == null;
+                    long createdAt = readLong(m.get("createdAt"), System.currentTimeMillis());
+                    long ownerLastSeen = readLong(m.get("ownerLastSeen"), createdAt);
+                    if (missingTimestamp) migrated = true;
+                    Group g = new Group(id, name, creator, createdAt, ownerLastSeen);
                     Object memObj = m.get("members");
                     if (memObj instanceof List<?> mems) {
                         for (Object mo : mems) {
@@ -169,19 +212,36 @@ public final class GroupRegistry {
                             }
                         }
                     }
-                    if (!g.members.isEmpty()) groups.put(id, g);
+                    if (g.members.isEmpty()) {
+                        log("warn | skip empty group | id=" + id);
+                        continue;
+                    }
+                    if (creator == null) log("warn | group has invalid creator | id=" + id);
+                    groups.put(id, g);
                 } catch (Throwable ignored) {
                     // 单条损坏只丢这个群
                 }
             }
+            if (groups.size() > MAX_GROUPS) log("warn | group count exceeds limit | groups=" + groups.size());
             log("loaded | groups=" + groups.size() + " | file=" + storePath);
+            if (migrated && !persistenceReadOnly) saveToDisk();
         } catch (Throwable t) {
-            log("read failed | file=" + storePath + " | " + t);
+            persistenceReadOnly = true;
+            log("read-only | group store read failed | file=" + storePath + " | " + t);
+        }
+    }
+
+    private static long readLong(Object value, long fallback) {
+        if (value instanceof Number n) return n.longValue();
+        try {
+            return value == null ? fallback : Long.parseLong(String.valueOf(value));
+        } catch (Throwable t) {
+            return fallback;
         }
     }
 
     private static synchronized void saveToDisk() {
-        if (storePath == null) return;
+        if (storePath == null || persistenceReadOnly) return;
         try {
             List<Map<String, Object>> list = new ArrayList<>();
             for (Group g : groups.values()) {
@@ -189,6 +249,8 @@ public final class GroupRegistry {
                 m.put("id", g.id.toString());
                 m.put("name", g.name);
                 m.put("creator", g.creator == null ? "" : g.creator.toString());
+                m.put("createdAt", g.createdAt);
+                m.put("ownerLastSeen", g.ownerLastSeen);
                 List<Map<String, Object>> mems = new ArrayList<>();
                 for (Map.Entry<UUID, String> e : g.members.entrySet()) {
                     Map<String, Object> mm = new LinkedHashMap<>();
@@ -200,11 +262,27 @@ public final class GroupRegistry {
                 list.add(m);
             }
             Map<String, Object> root = new LinkedHashMap<>();
-            root.put("version", 1);
+            root.put("version", 2);
             root.put("groups", list);
+            String json = GSON.toJson(root);
+            if (json.getBytes(StandardCharsets.UTF_8).length > MAX_FILE_BYTES) {
+                log("save skipped | serialized group store exceeds " + MAX_FILE_BYTES + " bytes");
+                persistenceReadOnly = true;
+                return;
+            }
             Files.createDirectories(storePath.getParent());
-            try (Writer w = Files.newBufferedWriter(storePath, StandardCharsets.UTF_8)) {
-                GSON.toJson(root, w);
+            Path tmp = storePath.resolveSibling(storePath.getFileName() + ".tmp");
+            try (FileChannel channel = FileChannel.open(tmp, StandardOpenOption.CREATE,
+                    StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)) {
+                ByteBuffer buffer = ByteBuffer.wrap(json.getBytes(StandardCharsets.UTF_8));
+                while (buffer.hasRemaining()) channel.write(buffer);
+                channel.force(true);
+            }
+            try {
+                Files.move(tmp, storePath, StandardCopyOption.REPLACE_EXISTING,
+                    StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException e) {
+                Files.move(tmp, storePath, StandardCopyOption.REPLACE_EXISTING);
             }
         } catch (IOException | RuntimeException t) {
             log("save failed | file=" + storePath + " | " + t);
@@ -289,6 +367,15 @@ public final class GroupRegistry {
         if (server == null || g == null || targets == null) return sent;
         LinkedHashSet<UUID> pending =
             pendingInvites.computeIfAbsent(g.id, k -> new LinkedHashSet<>());
+        Map<UUID, Long> expiry = pendingInviteAt.computeIfAbsent(g.id, k -> new LinkedHashMap<>());
+        long now = System.currentTimeMillis();
+        for (UUID old : new ArrayList<>(pending)) {
+            Long exp = expiry.get(old);
+            if (exp != null && now > exp) {
+                pending.remove(old);
+                expiry.remove(old);
+            }
+        }
         UUID inviterId = inviter == null ? null : inviter.getUUID();
         String inviterName = inviter == null ? "" : inviter.getName().getString();
         for (UUID uuid : targets) {
@@ -303,6 +390,7 @@ public final class GroupRegistry {
                 continue;
             }
             pending.add(uuid);
+            expiry.put(uuid, now + PENDING_INVITE_TTL_MS);
             sendInviteEvent(target, g, GroupInviteEventPayload.KIND_INVITE, inviterName,
                 target.getName().getString());
             sent.add(uuid);
@@ -343,9 +431,31 @@ public final class GroupRegistry {
     public static synchronized void create(MinecraftServer server, ServerPlayer creator,
                                            GroupCreatePayload payload) {
         if (server == null || creator == null || payload == null) return;
+        if (groups.size() >= MAX_GROUPS) {
+            creator.sendSystemMessage(net.minecraft.network.chat.Component.translatable("e33chat.group.create_limit"));
+            log("create denied | global limit reached | groups=" + groups.size());
+            return;
+        }
+        int owned = 0;
+        for (Group existing : groups.values()) {
+            if (creator.getUUID().equals(existing.creator)) owned++;
+        }
+        if (owned >= MAX_GROUPS_PER_PLAYER) {
+            creator.sendSystemMessage(net.minecraft.network.chat.Component.translatable("e33chat.group.create_limit_player"));
+            log("create denied | player limit | player=" + creator.getName().getString() + " | owned=" + owned);
+            return;
+        }
+        long now = System.currentTimeMillis();
+        Long lastCreate = createCooldown.get(creator.getUUID());
+        if (lastCreate != null && now - lastCreate < CREATE_COOLDOWN_MS) {
+            creator.sendSystemMessage(net.minecraft.network.chat.Component.translatable("e33chat.group.create_cooldown"));
+            log("create denied | cooldown | player=" + creator.getName().getString());
+            return;
+        }
         UUID id = UUID.randomUUID();
         String name = GroupWire.clamp(payload.groupName(), GroupWire.MAX_NAME).trim();
-        Group g = new Group(id, name, creator.getUUID());
+        Group g = new Group(id, name, creator.getUUID(), now, now);
+        createCooldown.put(creator.getUUID(), now);
         g.members.put(creator.getUUID(), creator.getName().getString());
         groups.put(id, g);
         saveToDisk();
@@ -412,6 +522,14 @@ public final class GroupRegistry {
         if (g == null) { log("invite_respond ignored | unknown group | " + payload); return; }
         UUID me = player.getUUID();
         LinkedHashSet<UUID> pending = pendingInvites.get(g.id);
+        Map<UUID, Long> expiry = pendingInviteAt.get(g.id);
+        if (expiry != null && expiry.containsKey(me)
+            && System.currentTimeMillis() > expiry.get(me)) {
+            if (pending != null) pending.remove(me);
+            expiry.remove(me);
+            log("invite_respond ignored | expired | player=" + name(player) + " | " + g.id);
+            return;
+        }
         if (g.hasMember(me)) {
             if (pending != null) pending.remove(me);
             log("invite_respond ignored | already member | player=" + name(player) + " | " + g.id);
@@ -421,6 +539,7 @@ public final class GroupRegistry {
             log("invite_respond ignored | not invited | player=" + name(player) + " | " + payload);
             return;
         }
+        if (expiry != null) expiry.remove(me);
         String inviterName = nameOf(server, g.creator, "");
         ServerPlayer creator = g.creator == null ? null
             : server.getPlayerList().getPlayer(g.creator);
@@ -455,8 +574,8 @@ public final class GroupRegistry {
                                           GroupKickPayload payload) {
         Group g = byId(payload == null ? null : payload.groupId());
         if (g == null) { log("kick ignored | unknown group"); return; }
-        if (actor == null || !g.hasMember(actor.getUUID())) {
-            log("kick denied | not a member | actor=" + name(actor));
+        if (actor == null || g.creator == null || !g.creator.equals(actor.getUUID())) {
+            log("kick denied | actor is not creator | actor=" + name(actor));
             return;
         }
         UUID target = payload.target();
@@ -474,6 +593,7 @@ public final class GroupRegistry {
         if (g.members.isEmpty()) {
             groups.remove(g.id);
             pendingInvites.remove(g.id);
+            pendingInviteAt.remove(g.id);
             saveToDisk();
             log("kick -> group empty, removed | " + g.id);
             return;
@@ -486,12 +606,18 @@ public final class GroupRegistry {
         Group g = byId(payload == null ? null : payload.groupId());
         if (g == null || actor == null) return;
         if (!g.hasMember(actor.getUUID())) return;
+        if (g.creator != null && g.creator.equals(actor.getUUID())) {
+            log("leave denied | owner must transfer or disband | actor=" + name(actor) + " | " + g);
+            actor.sendSystemMessage(net.minecraft.network.chat.Component.translatable("e33chat.group.owner_must_transfer"));
+            return;
+        }
         g.members.remove(actor.getUUID());
         log("leave | actor=" + name(actor) + " | " + g);
         sendEvent(actor, g, GroupEventPayload.KIND_LEFT, g.name);
         if (g.members.isEmpty()) {
             groups.remove(g.id);
             pendingInvites.remove(g.id);
+            pendingInviteAt.remove(g.id);
             saveToDisk();
             log("leave -> group empty, removed | " + g.id);
             return;
@@ -508,19 +634,110 @@ public final class GroupRegistry {
             log("disband denied | not a member | actor=" + name(actor));
             return;
         }
-        // 只有创建者能解散（其它成员请用 group_leave 退出）：避免"任何人一键删掉别人的群"
-        if (g.creator != null && !g.creator.equals(actor.getUUID())) {
+        // 只有创建者能解散（其它成员请用 group_leave 退出）：creator 缺失/非法时同样拒绝。
+        if (g.creator == null || !g.creator.equals(actor.getUUID())) {
             log("disband denied | actor is not creator | actor=" + name(actor) + " | " + g);
             return;
         }
         groups.remove(g.id);
         pendingInvites.remove(g.id);
+        pendingInviteAt.remove(g.id);
         saveToDisk();
         log("disband | actor=" + name(actor) + " | " + g);
         for (UUID uuid : g.members.keySet()) {
             ServerPlayer p = server.getPlayerList().getPlayer(uuid);
             if (p != null) sendEvent(p, g, GroupEventPayload.KIND_DISBANDED, g.name);
         }
+    }
+
+    /** 群主主动转让群主；原群主保留成员身份并降为普通成员。 */
+    public static synchronized void transfer(MinecraftServer server, ServerPlayer actor,
+                                              GroupTransferPayload payload) {
+        Group g = byId(payload == null ? null : payload.groupId());
+        if (g == null || actor == null) return;
+        if (g.creator == null || !g.creator.equals(actor.getUUID())) {
+            log("transfer denied | actor is not creator | actor=" + name(actor) + " | " + g);
+            return;
+        }
+        UUID target = payload.target();
+        if (target == null || target.equals(g.creator) || !g.hasMember(target)) {
+            log("transfer denied | target invalid | actor=" + name(actor) + " | target=" + target);
+            return;
+        }
+        g.creator = target;
+        g.ownerLastSeen = System.currentTimeMillis();
+        pendingInvites.remove(g.id);
+        pendingInviteAt.remove(g.id);
+        saveToDisk();
+        log("transfer | actor=" + name(actor) + " | target=" + target + " | " + g);
+        broadcastSync(server, g);
+        ServerPlayer oldOwner = server.getPlayerList().getPlayer(actor.getUUID());
+        if (oldOwner != null) sendSync(oldOwner, g);
+    }
+
+    public static synchronized void markLogin(UUID playerId) {
+        if (playerId == null) return;
+        long now = System.currentTimeMillis();
+        boolean changed = false;
+        for (Group g : groups.values()) {
+            if (playerId.equals(g.creator) && g.ownerLastSeen < now) {
+                g.ownerLastSeen = now;
+                changed = true;
+            }
+        }
+        if (changed) saveToDisk();
+    }
+
+    public static synchronized int cleanupInactive(MinecraftServer server, long now) {
+        List<Group> removed = new ArrayList<>();
+        for (Group g : new ArrayList<>(groups.values())) {
+            if (g.creator == null) {
+                log("warn | skip cleanup, invalid creator | id=" + g.id);
+                continue;
+            }
+            ServerPlayer online = server.getPlayerList().getPlayer(g.creator);
+            if (online != null) {
+                g.ownerLastSeen = now;
+                continue;
+            }
+            if (g.ownerLastSeen > 0 && now - g.ownerLastSeen > OWNER_INACTIVE_MS) {
+                removed.add(g);
+            }
+        }
+        for (Group g : removed) {
+            groups.remove(g.id);
+            pendingInvites.remove(g.id);
+            pendingInviteAt.remove(g.id);
+            for (UUID uuid : g.members.keySet()) {
+                ServerPlayer p = server.getPlayerList().getPlayer(uuid);
+                if (p != null) sendEvent(p, g, GroupEventPayload.KIND_DISBANDED, g.name);
+            }
+            log("cleanup | disband inactive group | " + g);
+        }
+        if (!removed.isEmpty()) saveToDisk();
+        return removed.size();
+    }
+
+    public static synchronized boolean adminDelete(MinecraftServer server, String groupId) {
+        if (persistenceReadOnly) return false;
+        Group g = byId(groupId);
+        if (g == null) return false;
+        groups.remove(g.id);
+        pendingInvites.remove(g.id);
+        pendingInviteAt.remove(g.id);
+        saveToDisk();
+        if (server != null) {
+            for (UUID uuid : g.members.keySet()) {
+                ServerPlayer p = server.getPlayerList().getPlayer(uuid);
+                if (p != null) sendEvent(p, g, GroupEventPayload.KIND_DISBANDED, g.name);
+            }
+        }
+        log("admin delete | " + g);
+        return true;
+    }
+
+    public static synchronized List<Group> allGroups() {
+        return new ArrayList<>(groups.values());
     }
 
     /** 转发一条群消息给全体在线成员（含发送者）。 */
@@ -563,7 +780,8 @@ public final class GroupRegistry {
         Group g = byId(payload == null ? null : payload.groupId());
         if (g == null) { log("image ignored | unknown group | group=" + (payload == null ? "null" : payload.groupId())); return; }
         if (sender == null || !g.hasMember(sender.getUUID())) {
-            log("image denied | not a member | sender=" + name(sender) + " | " + g); return;
+            log("image denied | not a member | sender=" + name(sender) + " | " + g);
+            return;
         }
         String content = GroupWire.clamp(payload.content(), ImageMessagePayload.MAX_CONTENT);
         if (content.isBlank()) return;
@@ -579,8 +797,12 @@ public final class GroupRegistry {
             if (uuid.equals(sender.getUUID())) continue;
             ServerPlayer p = server.getPlayerList().getPlayer(uuid);
             if (p == null) continue;
-            try { ServerPlayNetworking.send(p, relay); n++; }
-            catch (Throwable t) { log("image relay failed | player=" + p.getName().getString() + " | " + t); }
+            try {
+                ServerPlayNetworking.send(p, relay);
+                n++;
+            } catch (Throwable t) {
+                log("image relay failed | player=" + p.getName().getString() + " | " + t);
+            }
         }
         log("image | from=" + sender.getName().getString() + " | " + g
             + " | recipients=" + n + " | hash=" + msgHash);

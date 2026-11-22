@@ -106,6 +106,10 @@ public class ChatBubbleClientSetup implements ClientModInitializer {
         whisperUnavailableNotices.clear();
         groupSupportPending = false;
         groupSupportTicks = 0;
+        try {
+            com.niuqu.chatbubble.image.MediaClient.resetConnectionState();
+        } catch (Throwable ignored) {
+        }
     }
 
     /** JOIN 后探测群聊支持（由 END_CLIENT_TICK 每 tick 调，自己在内部计数）。
@@ -604,6 +608,7 @@ public class ChatBubbleClientSetup implements ClientModInitializer {
                 } finally {
                     connectionPending = false;
                     playSessionSeen = false;
+                    resetConnectionState();
                 }
             });
 

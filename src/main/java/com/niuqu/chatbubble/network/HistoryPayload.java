@@ -26,40 +26,45 @@ public record HistoryPayload(List<HistoryPayload.HistoryEntry> entries)
     ) {}
 
     /** 历史条目数的读侧上限（DoS 防护）。 */
-    private static final int MAX_ENTRIES = 4096;
+    public static final int MAX_ENTRIES = 50;
+    public static final int MAX_TEXT = 8192;
 
     public static final StreamCodec<FriendlyByteBuf, HistoryPayload> CODEC = StreamCodec.ofMember(
         (value, buf) -> {
             List<HistoryEntry> out = value.entries != null ? value.entries : List.of();
-            buf.writeVarInt(out.size());
-            for (HistoryEntry e : out) {
-                buf.writeUtf(e.senderUUID().toString());
-                buf.writeUtf(e.senderName());
-                buf.writeUtf(e.content());
+            int n = Math.min(out.size(), MAX_ENTRIES);
+            buf.writeVarInt(n);
+            for (int i = 0; i < n; i++) {
+                HistoryEntry e = out.get(i);
+                GroupWire.writeString(buf, e.senderUUID() == null ? "" : e.senderUUID().toString(), 64);
+                GroupWire.writeString(buf, e.senderName(), 64);
+                GroupWire.writeString(buf, e.content(), MAX_TEXT);
                 buf.writeLong(e.time());
                 buf.writeBoolean(e.isSystem());
-                buf.writeUtf(e.replyContent() != null ? e.replyContent() : "");
-                buf.writeUtf(e.replySender() != null ? e.replySender() : "");
+                GroupWire.writeString(buf, e.replyContent() != null ? e.replyContent() : "", MAX_TEXT);
+                GroupWire.writeString(buf, e.replySender() != null ? e.replySender() : "", 64);
             }
         },
         buf -> {
-            int count = buf.readVarInt();
-            if (count < 0 || count > MAX_ENTRIES) {
-                throw new IllegalArgumentException("bad history size " + count);
+            try {
+                int count = buf.readVarInt();
+                if (count < 0 || count > MAX_ENTRIES) return new HistoryPayload(List.of());
+                List<HistoryEntry> entries = new ArrayList<>(count);
+                for (int i = 0; i < count; i++) {
+                    entries.add(new HistoryEntry(
+                        UUID.fromString(GroupWire.readString(buf, 64)),
+                        GroupWire.readString(buf, 64),
+                        GroupWire.readString(buf, MAX_TEXT),
+                        buf.readLong(),
+                        buf.readBoolean(),
+                        nullOrEmpty(GroupWire.readString(buf, MAX_TEXT)),
+                        nullOrEmpty(GroupWire.readString(buf, 64))
+                    ));
+                }
+                return new HistoryPayload(entries);
+            } catch (Throwable t) {
+                return new HistoryPayload(List.of());
             }
-            List<HistoryEntry> entries = new ArrayList<>(Math.min(count, 128));
-            for (int i = 0; i < count; i++) {
-                entries.add(new HistoryEntry(
-                    UUID.fromString(buf.readUtf()),
-                    buf.readUtf(),
-                    buf.readUtf(),
-                    buf.readLong(),
-                    buf.readBoolean(),
-                    nullOrEmpty(buf.readUtf()),
-                    nullOrEmpty(buf.readUtf())
-                ));
-            }
-            return new HistoryPayload(entries);
         }
     );
 

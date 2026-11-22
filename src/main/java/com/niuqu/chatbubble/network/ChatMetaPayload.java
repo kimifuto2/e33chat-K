@@ -50,8 +50,9 @@ public record ChatMetaPayload(UUID senderUUID, String senderName, String message
             buf.writeUtf(str(value.quoteSender));
             buf.writeUtf(str(value.quoteContent));
             List<String> mentionsOut = value.mentionTargets != null ? value.mentionTargets : List.of();
-            buf.writeVarInt(mentionsOut.size());
-            for (String mention : mentionsOut) buf.writeUtf(mention);
+            int mentionOut = Math.min(mentionsOut.size(), 64);
+            buf.writeVarInt(mentionOut);
+            for (int i = 0; i < mentionOut; i++) GroupWire.writeString(buf, mentionsOut.get(i), 64);
             buf.writeUtf(str(value.quotedHash));
         },
         buf -> {
@@ -62,18 +63,18 @@ public record ChatMetaPayload(UUID senderUUID, String senderName, String message
                 } catch (Throwable ignored) {
                     // 损坏的 UUID 只让这条 meta 失效，不影响连接
                 }
-                String senderName = buf.readUtf();
-                String messageHash = buf.readUtf();
-                String quoteSender = buf.readUtf();
-                String quoteContent = buf.readUtf();
+                String senderName = GroupWire.readString(buf, 64);
+                String messageHash = GroupWire.readString(buf, 64);
+                String quoteSender = GroupWire.readString(buf, 64);
+                String quoteContent = GroupWire.readString(buf, 8192);
                 int mentionCount = buf.readVarInt();
-                if (mentionCount < 0 || mentionCount > MAX_MENTIONS) {
+                if (mentionCount < 0 || mentionCount > 64) {
                     throw new IllegalArgumentException("bad mention count " + mentionCount);
                 }
-                List<String> mentions = new ArrayList<>(Math.min(mentionCount, 16));
-                for (int i = 0; i < mentionCount; i++) mentions.add(buf.readUtf());
+                List<String> mentions = new ArrayList<>(mentionCount);
+                for (int i = 0; i < mentionCount; i++) mentions.add(GroupWire.readString(buf, 64));
                 // 追加字段：旧版服务端不发 → 读不到就当空（退化成内容兜底）
-                String quotedHash = buf.isReadable() ? buf.readUtf() : "";
+                String quotedHash = buf.isReadable() ? GroupWire.readString(buf, 64) : "";
                 if (sender == null) return invalid();
                 return new ChatMetaPayload(sender, senderName, messageHash, quoteSender, quoteContent,
                     mentions != null ? mentions : List.of(), quotedHash);

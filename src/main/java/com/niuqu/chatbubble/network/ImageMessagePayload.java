@@ -37,14 +37,14 @@ public record ImageMessagePayload(String scope, String groupId, String targetNam
             GroupWire.writeString(buf, GroupWire.clamp(value.scope, 16));
             GroupWire.writeString(buf, GroupWire.clamp(value.groupId, 64));
             GroupWire.writeString(buf, GroupWire.clamp(value.targetName, MAX_NAME));
-            GroupWire.writeString(buf, GroupWire.clamp(value.content, MAX_CONTENT));
+            GroupWire.writeString(buf, GroupWire.clamp(value.content, MAX_CONTENT), MAX_CONTENT);
             GroupWire.writeString(buf, GroupWire.clamp(value.msgHash, 64));
         },
         buf -> {
             try {
                 return new ImageMessagePayload(
                     GroupWire.readString(buf), GroupWire.readString(buf), GroupWire.readString(buf),
-                    GroupWire.readString(buf), GroupWire.readString(buf));
+                    GroupWire.readString(buf, ImageMessagePayload.MAX_CONTENT), GroupWire.readString(buf));
             } catch (Throwable t) {
                 return new ImageMessagePayload("", "", "", "", "");
             }
