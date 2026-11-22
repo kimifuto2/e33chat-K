@@ -50,6 +50,13 @@ public class EditBoxSelectionMixin {
         if (end <= start) return;
         int x1 = textX + font.width(value.substring(displayPos, start));
         int x2 = textX + font.width(value.substring(displayPos, end));
+        // 长 URL/指令全选时，文字会横向滚动；选中背景必须夹在输入框自己的可见区域内，
+        // 否则会画成一条超出屏幕的长条（26.x 的 EditBox 原版 highlight 也不裁 x2）。
+        int left = ((EditBox) (Object) this).getX();
+        int right = left + ((EditBox) (Object) this).getWidth();
+        x1 = Math.max(left, Math.min(right, x1));
+        x2 = Math.max(left, Math.min(right, x2));
+        if (x2 <= x1) return;
         g.fill(x1, textY - 1, x2, textY + 9, ChatTextSelection.selectionBg());
     }
 
