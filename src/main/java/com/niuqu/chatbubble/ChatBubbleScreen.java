@@ -597,6 +597,8 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
     private static final int INPUT_CURSOR_RESERVE = 6;
     /** 输入框右侧给「展开编辑」箭头预留的宽度；箭头只画 ^，不要竖杆。 */
     private static final int INPUT_EDITOR_RESERVE = 14;
+    /** 输入框右上角圆形展开按钮直径（同时是输入框文字区右侧预留量）。 */
+    private static final int INPUT_EDITOR_BTN_S = 14;
     private static final int INPUT_EDITOR_MAX_H = 160;
 
     /** 输入框宽度的唯一算法（窄窗口下不能算出 0/负值，见 {@link #MIN_INPUT_W}）。 */
@@ -2479,11 +2481,6 @@ boolean selDrag = textSelection.isDragActive();
         int sendX = panelX + panelW - PAD - ICON_S + 2;
         int emojiX = sendX - ICON_S - 4;
         int imageX = emojiX - ICON_S - 4;
-        if (mx >= imageX - INPUT_EDITOR_RESERVE - 1 && mx <= imageX - INPUT_EDITOR_RESERVE + 11
-                && my >= iconY && my <= iconY + ICON_S) {
-            toggleInputEditor();
-            return true;
-        }
         if (mx >= imageX && mx <= imageX + ICON_S && my >= iconY && my <= iconY + ICON_S) {
             if (settingsMenu.visible) beginPopupClose(s -> settingsCloseStart = s, () -> settingsMenu.visible = false);
             if (emojiPanel.visible) beginPopupClose(s -> emojiCloseStart = s, () -> emojiPanel.visible = false);
@@ -5048,13 +5045,19 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
         input.moveCursorToEnd(false);
     }
 
+    /** 输入框右上角的圆形展开按钮：圆心在输入框右边缘、垂直居中。 */
+    private int[] inputEditorButtonRect() {
+        int ibX = inputBaseX();
+        int ibW = input.getWidth() + INPUT_CURSOR_RESERVE + INPUT_EDITOR_RESERVE;
+        int ibY = inputBarY();
+        int d = INPUT_EDITOR_BTN_S;
+        return new int[]{ibX + ibW - d, ibY + (inputBarH() - d) / 2, d, d};
+    }
+
     private boolean isMouseOverInputEditorArrow(double mx, double my) {
-        int sendX = panelX + panelW - PAD - ICON_S + 2;
-        int emojiX = sendX - ICON_S - 4;
-        int imageX = emojiX - ICON_S - 4;
-        int ax = imageX - INPUT_EDITOR_RESERVE;
-        int iconY = barTop + (BAR_H - ICON_S) / 2;
-        return mx >= ax - 1 && mx <= ax + 11 && my >= iconY && my <= iconY + ICON_S;
+        int[] r = inputEditorButtonRect();
+        return mx >= r[0] - 2 && mx <= r[0] + r[2] + 2
+            && my >= r[1] - 2 && my <= r[1] + r[3] + 2;
     }
 
     private void clampInputEditorCursor() {
@@ -5239,9 +5242,6 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
         g.drawText(font, done, d[0] + (d[2] - font.width(done)) / 2,
             d[1] + (d[3] - font.lineHeight) / 2,
             ChatBubbleTheme.alphaBlend(c().textPrimary(), a255), false);
-        String hint = "Enter 写回";
-        g.drawText(font, hint, contentX, d[1] + (d[3] - font.lineHeight) / 2,
-            ChatBubbleTheme.alphaBlend(c().textMuted(), a255), false);
     }
 
     /** 返回 true 表示这次点击已被编辑面板吞掉。 */
@@ -5278,7 +5278,7 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
         int ibY = inputBarY();
         // 输入框本体宽 = 文字框宽（动作前缀已经是文本内容，不再额外占宽）。
         // 文本区收窄一个字母宽 + 底板补回，光标不会再压出圆角边框
-        int ibW = input.getWidth() + INPUT_CURSOR_RESERVE;
+        int ibW = input.getWidth() + INPUT_CURSOR_RESERVE + INPUT_EDITOR_RESERVE;
         int ibH = inputBarH();
         // Rounded input box with a subtle border. Radius uses the same set as the
         // bottom-bar icon buttons (drawIconButton: outer ring 6f + 1px inset 5f) so the
@@ -5319,13 +5319,20 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
             && mouseY >= iconY && mouseY <= iconY + ICON_S;
         drawIconButton(g, iconTex("send"), sendX, iconY, ICON_S - 1, getAnimProgress(), hoverSend);
 
-        int editorArrowX = imageX - INPUT_EDITOR_RESERVE;
-        boolean hoverEditorArrow = mouseX >= editorArrowX - 1 && mouseX <= editorArrowX + 11
-            && mouseY >= iconY && mouseY <= iconY + ICON_S;
+        // 输入框右上角的圆形展开按钮：用圆盖住输入框该角，箭头在圆心。
+        int[] ar = inputEditorButtonRect();
+        boolean hoverEditorArrow = mouseX >= ar[0] - 2 && mouseX <= ar[0] + ar[2] + 2
+            && mouseY >= ar[1] - 2 && mouseY <= ar[1] + ar[3] + 2;
+        int arrowBorder = ChatBubbleTheme.alphaBlend(
+            hoverEditorArrow ? c().nameColor() : c().textMuted(), a255);
+        int arrowBg = ChatBubbleTheme.alphaBlend(c().inputBg(), a255);
+        RoundRectRenderer.fill(g, ar[0] - 1, ar[1] - 1, ar[0] + ar[2] + 1, ar[1] + ar[3] + 1,
+            8f, arrowBorder);
+        RoundRectRenderer.fill(g, ar[0], ar[1], ar[0] + ar[2], ar[1] + ar[3], 7f, arrowBg);
         int arrowColor = ChatBubbleTheme.alphaBlend(
             hoverEditorArrow ? c().nameColor() : c().textMuted(), a255);
         g.getMatrices().pushMatrix();
-        g.getMatrices().translate(editorArrowX + 5f, iconY + ICON_S / 2f);
+        g.getMatrices().translate(ar[0] + ar[2] / 2f, ar[1] + ar[3] / 2f);
         g.drawText(font, "^", -font.width("^") / 2, -font.lineHeight / 2, arrowColor, false);
         g.getMatrices().popMatrix();
     }
