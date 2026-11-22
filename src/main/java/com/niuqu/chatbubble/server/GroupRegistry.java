@@ -160,6 +160,12 @@ public final class GroupRegistry {
         }
     }
 
+    /** 服务器停止：先保存再清空，确保 cleanupInactive 更新的 ownerLastSeen 落盘。 */
+    public static synchronized void shutdown() {
+        saveToDisk();
+        reset();
+    }
+
     /** 服务器停止：清空内存态，让下一个世界按自己的文件重新加载。 */
     public static synchronized void reset() {
         groups.clear();
@@ -214,12 +220,19 @@ public final class GroupRegistry {
                     }
                     if (g.members.isEmpty()) {
                         log("warn | skip empty group | id=" + id);
+                        persistenceReadOnly = true;
                         continue;
                     }
-                    if (creator == null) log("warn | group has invalid creator | id=" + id);
+                    if (creator == null || !g.members.containsKey(creator)) {
+                        // 不自动猜测新群主：标记为无效群，交给服务器管理员处理。
+                        log("warn | invalid creator not in members | id=" + id + " | creator=" + creator);
+                        g.creator = null;
+                    }
                     groups.put(id, g);
-                } catch (Throwable ignored) {
-                    // 单条损坏只丢这个群
+                } catch (Throwable t) {
+                    // 单条损坏：记录 ID 并进入只读，避免后续保存把原文件覆盖成“只剩好群”。
+                    log("warn | corrupt group record | id=" + (m.get("id")) + " | " + t);
+                    persistenceReadOnly = true;
                 }
             }
             if (groups.size() > MAX_GROUPS) log("warn | group count exceeds limit | groups=" + groups.size());
