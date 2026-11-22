@@ -500,7 +500,7 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
         commandSuggestions.refresh();
 
 
-        sidebarSearchBox = new TextFieldWidget(textRenderer, 2 + SIDEBAR_SEARCH_TEXT_INSET, 5,
+        sidebarSearchBox = new TextFieldWidget(textRenderer, 2 + SIDEBAR_SEARCH_TEXT_INSET, 2,
             SIDEBAR_SEARCH_W - 6, SIDEBAR_SEARCH_H, Text.literal(""));
         sidebarSearchBox.setMaxLength(20);
         sidebarSearchBox.setDrawsBackground(false);
@@ -729,20 +729,21 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
         rebuildLayout();
     }
 
-    private static final int SIDEBAR_SEARCH_H = 14;
+    private static final int SIDEBAR_SEARCH_H = 23;
     /** 侧边栏搜索框宽度：**缩短**让位给「+」按钮，但两者要挨紧——
      *  行内布局（侧边栏宽 90、右侧 1px 分隔线、左右各留 2px 边距）：
-     *  搜索框 [1, 2+64]，「+」按钮 [71, 87]，两者间距 5px，右侧到分隔线 2px。 */
+     *  搜索框 [1, 2+64]，「+」按钮 [71, 87]，两者间距 5px，右侧到分隔线 2px。
+     *  高度 23：外框从 y=2 画到 y=24，和右侧标题栏 DIVIDER（titleY+TITLE_H=24）同一条下边框。 */
     private static final int SIDEBAR_SEARCH_W = 64;
     /** 搜索框内文字的左侧缩进（相对搜索框左缘 sbx）。加描边后内壁比原来内缩 1px，
      *  这里再留 2px 内边距，文字/占位符与描边之间才不会贴死 —— 字段 x 与占位符 x 共用这个值。 */
     private static final int SIDEBAR_SEARCH_TEXT_INSET = 2;
     /** 「+」新建群聊按钮：与搜索框同高、右对齐；圆角/描边与其它图标按钮同一套（6/5）。
      *  尺寸 16px（原 14px 的加号笔画太细、也太小）：按钮 [71, 87]，搜索框 [2, 16]，
-     *  二者中心线都在 y=9，视觉上是一条整齐的行。 */
+     *  二者中心线都在 y=13，视觉上是一条整齐的行。 */
     private static final int SIDEBAR_ADD_S = 16;
     private static final int SIDEBAR_ADD_X = SIDEBAR_W - 1 - 2 - SIDEBAR_ADD_S;
-    private static final int SIDEBAR_ADD_Y = 1;
+    private static final int SIDEBAR_ADD_Y = 5;
     /** 群聊行高 **28px**（用户选的 B 方案：只把群行加高，好让九宫格头像更大更清晰）。
      *  私聊/玩家行仍是 {@link #SIDEBAR_ITEM_H} = 22px —— 两种行高由 {@link #rowHeight}
      *  按行类型给出，绘制、点击命中带、滚动总高三处都按它逐行累加，不存在"统一行高"的假设。
@@ -774,9 +775,9 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
      *  第 5 轮：群免打扰的紫月亮改成画在**这里**（与私聊行「🌙 名字」一致），群名右移到
      *  {@code 30 + 9 + 2 = 41}（与私聊行的 {@code 22 + 9 + 2 = 33} 同一套算法，见 renderGroupRow）。 */
     private static final int GROUP_NAME_X = 30;
-    /** 侧边栏玩家列表可见区顶部 Y：搜索框（2+14）+ 3 间隔 + 世界频道行（22）+ 2 间隔。
+    /** 侧边栏玩家列表可见区顶部 Y：搜索框（2+23）+ 世界频道行（22）+ 2 间隔。
      *  绘制与点击命中共用这一个值，滚动夹紧也用它算可见高度。 */
-    private static final int SIDEBAR_LIST_TOP = 2 + SIDEBAR_SEARCH_H + 3 + SIDEBAR_ITEM_H + 2;
+    private static final int SIDEBAR_LIST_TOP = 2 + SIDEBAR_SEARCH_H + SIDEBAR_ITEM_H + 2;
 
     private void renderSidebar(DrawContext g, int mouseX, int mouseY, float alpha) {
         ColoredTextureRenderer.drawWithAlpha(g, UiTextureManager.rl(UiElement.SIDEBAR_BG), 0, 0, SIDEBAR_W, height, alpha);
@@ -802,19 +803,19 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
         RoundRectRenderer.fill(g, sbx - 1, sby, sbx + sbw, sby + sbh, 5f, searchBorder);
         RoundRectRenderer.fill(g, sbx, sby + 1, sbx + sbw - 1, sby + sbh - 1, 4f,
             ChatBubbleTheme.alphaBlend(c().inputBg(), searchA));
-        boolean hoverSearch = mouseX >= sbx - 1 && mouseX <= sbx + sbw && mouseY >= sby && mouseY <= sby + sbh;
+        boolean hoverSearch = mouseX >= sbx - 1 && mouseX <= sbx + sbw && mouseY >= sby && mouseY < sby + sbh;
         if (hoverSearch && !sidebarSearchBox.isFocused())
             RoundRectRenderer.fill(g, sbx, sby + 1, sbx + sbw - 1, sby + sbh - 1, 4f,
                 ChatBubbleTheme.alphaBlend(c().popupHover(), searchA));
         if (sidebarSearchBox.getText().isEmpty() && !sidebarSearchBox.isFocused()) {
             g.drawText(textRenderer, Text.translatable("e33chat.sidebar.search").getString(),
-                sbx + SIDEBAR_SEARCH_TEXT_INSET, sby + 3, c().textMuted(), false);
+                sbx + SIDEBAR_SEARCH_TEXT_INSET, sby + (sbh - 8) / 2, c().textMuted(), false);
         }
         // 「+」新建群聊：右对齐圆角按钮（描边 6 / 内层 5，与聊天面板其它图标按钮同一套弧度）
         // 可用性判定只有一份：groupAddUsable()（绘制置灰 / 悬停高亮 / 点击命中全走它）
         drawGroupAddButton(g, SIDEBAR_ADD_X, SIDEBAR_ADD_Y, SIDEBAR_ADD_S, alpha,
             isMouseOverGroupAdd(mouseX, mouseY), groupAddUsable());
-        y = sby + sbh + 3;
+        y = sby + sbh;
 
         boolean isPublic = whisperPartner == null;
         boolean hoverTab = mouseX >= 0 && mouseX <= SIDEBAR_W && mouseY >= y && mouseY <= y + itemH;
@@ -1869,10 +1870,9 @@ if (this.getFocused() != null && this.getFocused().keyPressed(input))
         // Sidebar clicks
         int sidebarX = getSidebarScreenX();
         if ((sidebarOpen || sidebarAnimating) && button == 0 && origX >= sidebarX && origX <= sidebarX + SIDEBAR_W) {
-            // 搜索框那一行的命中带：「+」按钮比搜索框高 2px（16 vs 14，两者中心线对齐），
-            // 所以从按钮的最上沿（SIDEBAR_ADD_Y）开始算，高度取按钮高度，避免按钮上下 1px 点不到。
-            int searchY = SIDEBAR_ADD_Y;
-            int searchH = SIDEBAR_ADD_S;
+            // 搜索框那一行的命中带：覆盖搜索框本体（含外框圆角），也覆盖「+」按钮。
+            int searchY = 2;
+            int searchH = SIDEBAR_SEARCH_H;
             // 侧边栏本地坐标（滑动过程中 origX 与本地 x 差一个 sidebarX）
             double localX = origX - sidebarX;
             if (mouseY >= searchY && mouseY <= searchY + searchH) {
@@ -1884,7 +1884,7 @@ if (this.getFocused() != null && this.getFocused().keyPressed(input))
                     return true;
                 }
                 if (localX >= 1 && localX <= 2 + SIDEBAR_SEARCH_W
-                    && mouseY >= 2 && mouseY <= 2 + SIDEBAR_SEARCH_H) {
+                    && mouseY >= 2 && mouseY < 2 + SIDEBAR_SEARCH_H) {
                     sidebarSearchBox.mouseClicked(click, doubleClick);
                     setFocused(sidebarSearchBox);
                     if (button == 0) setDragging(true);
@@ -1894,7 +1894,7 @@ if (this.getFocused() != null && this.getFocused().keyPressed(input))
             }
             if (sidebarSearchBox.isFocused()) setFocused(chatField);
 
-            int y2 = 2 + SIDEBAR_SEARCH_H + 3;
+            int y2 = 2 + SIDEBAR_SEARCH_H;
             if (mouseY >= y2 && mouseY <= y2 + SIDEBAR_ITEM_H) {
                 enterConversation(null); return true;
             }
