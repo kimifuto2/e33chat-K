@@ -376,7 +376,6 @@ searchField.setTextShadow(false);
             return;
         }
 
-        dimHost(g);
         drawCard(g);
         var c = GroupUi.colors();
 
@@ -397,9 +396,9 @@ searchField.setTextShadow(false);
         GroupUi.fieldBox(g, fieldX, fieldY, fieldW, FIELD_H);
         if (!editing && nameField.getText().isEmpty()) {
             g.drawText(tr, Text.translatable("e33chat.group.settings.name_empty").getString(),
-                nameField.getX() + 1, nameField.getY(), c.textMuted(), false);
+                nameField.getX() + 1, nameField.getY(), GroupUi.a(c.textMuted()), false);
         }
-        nameField.render(g, mouseX, mouseY, delta);
+        if (GroupUi.renderAlpha() >= 0.999f) nameField.render(g, mouseX, mouseY, delta);
         hoverEdit = hit(mouseX, mouseY, saveX, fieldY, SAVE_W, FIELD_H);
         GroupUi.button(g, tr, saveX, fieldY, SAVE_W, FIELD_H,
             Text.translatable(editing
@@ -410,9 +409,9 @@ searchField.setTextShadow(false);
         GroupUi.fieldBox(g, cardX + 8, searchY, searchFieldW, FIELD_H);
         if (searchField.getText().isEmpty()) {
             g.drawText(tr, Text.translatable("e33chat.group.settings.search_hint").getString(),
-                searchField.getX() + 1, searchField.getY(), c.textMuted(), false);
+                searchField.getX() + 1, searchField.getY(), GroupUi.a(c.textMuted()), false);
         }
-        searchField.render(g, mouseX, mouseY, delta);
+        if (GroupUi.renderAlpha() >= 0.999f) searchField.render(g, mouseX, mouseY, delta);
         hoverSearch = hit(mouseX, mouseY, searchBtnX, searchY, SEARCH_BTN_W, FIELD_H);
         GroupUi.button(g, tr, searchBtnX, searchY, SEARCH_BTN_W, FIELD_H,
             Text.translatable("e33chat.group.search.button"), hoverSearch, false, false, true);
@@ -443,7 +442,7 @@ searchField.setTextShadow(false);
             int kickW = 40;
             g.drawText(tr,
                 GroupUi.ellipsize(tr, label, cardX + cardW - 12 - kickW - 8 - nameX),
-                nameX, y + (ROW_H - tr.fontHeight) / 2 + 1, c.textPrimary(), false);
+                nameX, y + (ROW_H - tr.fontHeight) / 2 + 1, GroupUi.a(c.textPrimary()), false);
 
             // 踢出：自己 / 创建者不可踢（服务端也会拒绝，这里只是不画按钮）
             if (!isSelf && !isCreator) {
