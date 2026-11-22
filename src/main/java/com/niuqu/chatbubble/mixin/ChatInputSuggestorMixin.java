@@ -11,6 +11,7 @@ import com.niuqu.chatbubble.render.Appearance;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.client.renderer.Rect2i;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -18,6 +19,9 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 
 @Mixin(value = CommandSuggestions.class, priority = 500)
 public class ChatInputSuggestorMixin {
+
+    @Shadow private int commandUsageWidth;
+    @Shadow private int commandUsagePosition;
 
     // 注意：这里**不能**再取消 extractRenderState。
     // 26.x 的 ChatInputSuggestorMixin 曾经 @Inject(HEAD, cancellable) 把
@@ -46,6 +50,10 @@ public class ChatInputSuggestorMixin {
         at = @At(value = "INVOKE",
             target = "Lnet/minecraft/client/gui/GuiGraphicsExtractor;text(Lnet/minecraft/client/gui/Font;Lnet/minecraft/util/FormattedCharSequence;III)V"))
     private void e33chat$noShadowUsage(GuiGraphicsExtractor g, Font font, FormattedCharSequence text, int x, int y, int color) {
+        // 用法/报错提示整行居中在底框里，而不是贴左边缘。
+        if (Minecraft.getInstance().gui.screen() instanceof ChatBubbleScreen) {
+            x = commandUsagePosition + (commandUsageWidth - font.width(text)) / 2;
+        }
         g.text(font, text, x, y, color, false);
     }
 
