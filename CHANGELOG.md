@@ -1,5 +1,18 @@
 # Changelog
 
+## v3.2.2（HUD/输入框配色 + 群聊持久化修补）
+
+**修复**
+- 暗色主题 HUD 未读红点被主题色 tint 成黑色：private_tip 红色贴图改为白色 tint，保留原红色。
+- 浅色主题左下角聊天图标与 `[Enter]` 改用主题主文字色（nameColor），不再复用米色主题偏橙的 quoteBar，避免与橙色主题撞色。
+- 输入框补全预览后缀（光标后的灰字）改为正文主色；26.2 / 26.3 的 EditBox 与 1.21.11 的 TextFieldWidget 同步处理。
+
+**群聊持久化审查修补**
+- Paper：save() 在只读状态直接跳过，损坏文件停服时不会被空内存覆盖；迁移保存移到 pending 邀请恢复之后。
+- Paper：重启恢复的 pending 邀请重新给予 10 分钟 TTL，不再永久有效；损坏群记录标记 damaged 并进入只读。
+- Fabric：停服改为先保存再清空，确保 ownerLastSeen 落盘；creator 不在 members 中的记录标记为无效并告警。
+- 同步更新 README / README_EN / JavaDoc 的群聊权限与 Paper 支持说明。
+
 ## v3.2.1（UI 收尾 + 通道机制合并）
 
 **源码审查修补**

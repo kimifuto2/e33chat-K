@@ -17,8 +17,8 @@ Fabric 客户端 --C2S e33chat:player_action--> PlayerActionRelay --S2C player_a
 （与 Fabric 端同一路径、同一 JSON 结构，重启不丢群）。不碰世界数据/实体/命令树，所以同一套线格式
 可以直接搬到 Bukkit 的插件通道 API 上。
 
-> **版本配对**：插件 3.1.0 对应客户端 **3.1.0**。群聊与动作是 3.1.0 新增的协议，3.0.x 客户端不认识
-> 这些通道（会安全丢弃，不会踢人，但功能不生效）。3.0.x 的引用/@提及功能在 3.1.0 插件上照旧可用。
+> **版本配对**：插件 3.2.2 对应客户端 **3.2.2**。群聊与动作是 3.1.0 新增的协议，3.0.x 客户端不认识
+> 这些通道（会安全丢弃，不会踢人，但功能不生效）。3.0.x 的引用/@提及功能在 3.2.2 插件上照旧可用。
 
 ## 线格式（与 Fabric 侧逐字节一致）
 
@@ -197,7 +197,7 @@ $env:JAVA_HOME = 'C:\BianChengJA\JDK\JDK25'   # paper-api 26.x 的 class 主版�
 & 'C:\AI\ds harness\工作区\聊天mod移植1.21.11\gradle-dist\gradle-9.8.2\bin\gradle.bat' --no-daemon --console=plain build
 ```
 
-产物：`build/libs/E33ChatPaper-26.2-3.1.0.jar`（**72,608 字节**，`paper-api` 是 `compileOnly`，不打进 jar）。
+产物：`build/libs/E33ChatPaper-26.2-3.2.2.jar`（**78,239 字节**，`paper-api` 是 `compileOnly`，不打进 jar）。
 
 | 项目 | 值 |
 |---|---|
@@ -205,7 +205,7 @@ $env:JAVA_HOME = 'C:\BianChengJA\JDK\JDK25'   # paper-api 26.x 的 class 主版�
 | `paper-api` 坐标 | `io.papermc.paper:paper-api:26.2.build.135-stable` |
 | `paper-plugin.yml` 的 `api-version` | **`'26.2'`**（26.x 写 `<major>.<minor>`，**不是** `'1.21'`） |
 | 编译工具链 | **JDK 25**（`options.release = 25`；paper-api 的 class 主版本是 69） |
-| 真机验证 | 已在 **Paper 26.2 build 135** 加载通过（插件 3.1.0 enabled + 11 进 7 出通道注册 + 群状态写入/重启读回 `<world>/serverconfig/e33chat-groups.json`） |
+| 真机验证 | 已在 **Paper 26.2 build 135** 加载通过（插件 3.2.2 enabled + 11 进 7 出通道注册 + 群状态写入/重启读回 `<world>/serverconfig/e33chat-groups.json`） |
 
 > 26.x 起版本坐标换了体系：`<mc>.build.<build>-<channel>`，**不再是** `1.21.11-R0.1-SNAPSHOT`。
 > 26.2 / 26.3 / 1.21.11 三份的 `src/main/java` **完全相同**（同一套协议实现），差异只在
@@ -216,7 +216,7 @@ $env:JAVA_HOME = 'C:\BianChengJA\JDK\JDK25'   # paper-api 26.x 的 class 主版�
 
 ## 安装与测试
 
-1. 把 `build/libs/E33ChatPaper-26.2-3.1.0.jar` 放进 **Paper 26.2**（build 135，服务端需 **Java 25**）的 `plugins/`，重启服务器。
+1. 把 `build/libs/E33ChatPaper-26.2-3.2.2.jar` 放进 **Paper 26.2**（build 135，服务端需 **Java 25**）的 `plugins/`，重启服务器。
 2. 服务器日志应出现（4 行：群状态文件路径 + 一行摘要 + 两行完整通道清单）：
    ```
    [E33Chat] group store file = C:\...\world\serverconfig\e33chat-groups.json
@@ -405,7 +405,7 @@ JSON 结构与 Fabric 端**逐字段一致**（Fabric 的 `GroupRegistry.saveToD
 
 ### 验现象
 
-1. 两个 3.1.0 客户端连同一 Paper 服，A 建群并勾选 B：
+1. 两个 3.2.2 客户端连同一 Paper 服，A 建群并勾选 B：
    - 服务端日志 `group_create recv | player=A | name='...' | members=1` +
      `invites dispatched | group=... | inviter=A | sent=1 | pending=1`；
    - B 在私聊里看到「A 邀请你加入 xxx」+ 接受/拒绝按钮；
@@ -455,7 +455,7 @@ C2S `player_action` → 校验 → S2C `player_action_relay`。**不回给发送
 | `quote_sync dropped \| ... IllegalArgumentException` | 客户端与本插件的协议不一致或包被截断；属预期丢弃，不会踢人 |
 | 客户端连上就被踢 `Invalid custom payload payload!` | 这是 Paper 对「客户端声明的自定义载荷」的校验（PaperMC/Paper#4201），与本插件无关；对策是客户端侧的通道白名单，或服务端 `-Dpaper.disableChannelLimit=true` |
 | 引用块只在引用者自己那里显示 | 说明 `chat_meta` 没送达其他人：检查是否所有玩家都装了 E33Chat 客户端；`recipients=` 是否为在线人数 |
-| 群聊功能完全不生效（无 `group_create recv`） | ① 客户端不是 3.1.0（3.0.x 不认识这些通道）；② 该服务器地址没进客户端白名单（公网地址见「安装与测试」第 3 条）；③ 其它插件抢先注册了同名通道 |
+| 群聊功能完全不生效（无 `group_create recv`） | ① 客户端不是 3.2.2（3.0.x 不认识这些通道）；② 该服务器地址没进客户端白名单（公网地址见「安装与测试」第 3 条）；③ 其它插件抢先注册了同名通道 |
 | 建群后只有创建者一个人在群里 | 邀请是 **pending** 语义：被邀请者必须在私聊里点「接受」。看日志有没有 `invites dispatched ... sent=N`（`sent=0` 说明对方**离线**或已是成员/已在 pending） |
 | 日志有 `invite skipped (offline)` | 被邀请者不在线：Paper 端与 Fabric 端一样**不排离线队列**，需要等他上线后再邀请 |
 | 群聊在服务端重启后全没了 | 先看日志有没有 `store load failed`（坏文件/无读权限 → 以空状态启动）和 `group store disabled`（加载时世界目录没就绪，本次运行纯内存）；再确认服务端是否用 `stop` 正常关闭（强杀只会丢最后一次未写盘的变化，已保存的群仍在） |
