@@ -315,7 +315,6 @@ public class GroupCreateScreen extends GroupModal {
     @Override
     public void render(UiCanvas g, int mouseX, int mouseY, float delta) {
         ensureLayout();
-        dimHost(g);
         drawCard(g);
 
         var c = GroupUi.colors();
@@ -326,16 +325,16 @@ public class GroupCreateScreen extends GroupModal {
         if (!GroupStore.available()) {
             String hint = Component.translatable("e33chat.group.unavailable").getString();
             g.drawText(tr, GroupUi.ellipsize(tr, hint, cardW - 20),
-                cardX + 10, cardY + TITLE_H - 1, c.redDot(), false);
+                cardX + 10, cardY + TITLE_H - 1, GroupUi.a(c.redDot()), false);
         }
 
         if (!isInviteMode() && nameField != null) {
             GroupUi.fieldBox(g, cardX + 8, fieldY, cardW - 16, FIELD_H);
             if (nameField.getValue().isEmpty()) {
                 g.drawText(tr, Component.translatable("e33chat.group.create.name_hint").getString(),
-                    nameField.getX() + 1, nameField.getY(), c.textMuted(), false);
+                    nameField.getX() + 1, nameField.getY(), GroupUi.a(c.textMuted()), false);
             }
-            nameField.extractRenderState(g.raw(), mouseX, mouseY, delta);
+            if (GroupUi.renderAlpha() >= 0.999f) nameField.extractRenderState(g.raw(), mouseX, mouseY, delta);
         }
 
         // ---- 「搜索玩家」行：输入框 + 同高/紧贴的搜索按钮 ----
@@ -343,9 +342,9 @@ public class GroupCreateScreen extends GroupModal {
         if (searchField != null) {
             if (searchField.getValue().isEmpty()) {
                 g.drawText(tr, Component.translatable("e33chat.group.search_hint").getString(),
-                    searchField.getX() + 1, searchField.getY(), c.textMuted(), false);
+                    searchField.getX() + 1, searchField.getY(), GroupUi.a(c.textMuted()), false);
             }
-            searchField.extractRenderState(g.raw(), mouseX, mouseY, delta);
+            if (GroupUi.renderAlpha() >= 0.999f) searchField.extractRenderState(g.raw(), mouseX, mouseY, delta);
         }
         hoverSearch = hit(mouseX, mouseY, searchBtnX, searchY, SEARCH_BTN_W, FIELD_H);
         GroupUi.button(g, tr, searchBtnX, searchY, SEARCH_BTN_W, FIELD_H,
@@ -368,7 +367,7 @@ public class GroupCreateScreen extends GroupModal {
             int nameX = cardX + 48;
             g.drawText(tr,
                 GroupUi.ellipsize(tr, m.name(), cardX + cardW - 12 - nameX),
-                nameX, y + (ROW_H - tr.lineHeight) / 2 + 1, c.textPrimary(), false);
+                nameX, y + (ROW_H - tr.lineHeight) / 2 + 1, GroupUi.a(c.textPrimary()), false);
             rowRects.add(new int[]{cardX + 4, y, cardW - 8, ROW_H, i});
             y += ROW_H + ROW_GAP;
         }
