@@ -181,9 +181,9 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
     public static int getInputY() { return inputY; }
     /** 指令候选窗底边：贴输入框视觉外框上沿，留 1px。 */
     public static int suggestionWindowBottom() {
-        // 候选列表下方还有 12px 的用法/报错提示行（extractUsage）；列表底边必须抬到
-        // 提示行上方，否则不透明的提示行底框会把整个候选列表盖住（看起来就是“候选框消失”）。
-        return inputY - INPUT_BOX_OUTSET - 14;
+        // 没有用法提示行时贴输入框视觉上沿 1px；有提示行时由 syncSuggestionGeometry
+        // 再向上让 12px，避免固定 14px 造成“候选框离输入框很远”。
+        return inputY - INPUT_BOX_OUTSET - 1;
     }
 
     /** 命令用法提示行需要上移的像素数（原版按贴屏幕底设计，会压住本模组底栏）。 */
@@ -471,7 +471,8 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
         int inputW = inputFieldWidth(inputX, sendX);
 
         input = new EditBox(font, inputX, ibY + 3, inputW, INPUT_H, Component.literal(""));
-        input.setMaxLength(256);
+        // 复制整条图片消息时会有多个 [[CICode]] URL；256 会在粘贴时截掉第 5 张之后的图片。
+        input.setMaxLength(4096);
         input.setBordered(false);
         int editColor = c().textPrimary();
         input.setTextColor(editColor);
@@ -1781,6 +1782,12 @@ if (this.getFocused() != null && this.getFocused().keyPressed(input))
             return true;
         }
         if (commandSuggestions != null && commandSuggestions.mouseScrolled(scrollY)) return true;
+        // 滚轮只在消息区生效：顶栏（标题/免打扰）和底栏（输入框）不属于消息列表，
+        // 在它们上面滚轮不能带动消息滚动条。
+        if (mouseY < msgTop || mouseY > msgBottom
+                || mouseX < panelX || mouseX > panelX + panelW) {
+            return true;
+        }
         scrollToBottom = false;
         lastScrollTime = Util.getMillis();
         float newTarget = Mth.clamp(scrollOffset - (int) (scrollY * 40), 0, maxScroll);
@@ -2101,6 +2108,7 @@ quickChatInput.setVisible(true);
             for (int[] r : bubbleRects) {
                 ChatMessageStore.ChatMessage msg = ChatMessageStore.getMessageAt(r[4]);
                 if (msg == null || msg.isSystem() || msg.isOwn()) continue;
+                if (!parseImages(msg).images().isEmpty()) continue; // 图片消息只认图片右键
                 if (msg.rawPlayerName() == null || msg.rawPlayerName().isEmpty()) continue;
                 int avatarX = r[0] - Appearance.avatarSize() - 4;
                 int avatarY = msg.replyContent() != null ? r[1] - font.lineHeight - 2 : r[1] - NAME_H;
@@ -2115,6 +2123,8 @@ quickChatInput.setVisible(true);
         // Bubble right-click
         if (button == 1) {
             for (int[] r : bubbleRects) {
+                ChatMessageStore.ChatMessage m = ChatMessageStore.getMessageAt(r[4]);
+                if (m != null && !parseImages(m).images().isEmpty()) continue; // 只由图片命中区打开
                 if (mouseX >= r[0] && mouseX <= r[0] + r[2]
                     && mouseY >= r[1] && mouseY <= r[1] + r[3]) {
                     contextMsgIndex = r[4]; contextX = (int) mouseX; contextY = (int) mouseY;
@@ -2275,6 +2285,9 @@ if (quotePressPending
             && Math.abs(click.x() - quotePressX) + Math.abs(click.y() - quotePressY) > 3.0) {
             quotePressPending = false;
         }
+        // 输入框横向拖选：鼠标超出输入框左右边界时，原版 EditBox 只把光标夹在可见首/尾，
+        // 不会自动横向滚动；这里按超出距离推进光标（selecting=true）实现平滑选字。
+        if (handleInputDragScroll(click.x(), click.y())) return true;
         // Selection drag first (a press either started a selection or the scrollbar
         // drag, never both  ?the scrollbar hit-test in mouseClicked returns earlier).
         if (textSelection.isDragActive()) {
@@ -2316,6 +2329,25 @@ if (quotePressPending
             return true;
         }
         return super.mouseDragged(click, dragX, dragY);
+    }
+
+    /** 输入框拖选越过左右边界时平滑推进/后退光标（只在输入框纵向范围内生效）。 */
+    private boolean handleInputDragScroll(double mouseX, double mouseY) {
+        if (!isDragging() || input == null || !input.isFocused()) return false;
+        int top = inputBarY() - INPUT_BOX_OUTSET;
+        int bottom = inputBarY() + INPUT_H + INPUT_BOX_OUTSET;
+        if (mouseY < top || mouseY > bottom) return false;
+        int left = input.getX();
+        int right = left + input.getWidth();
+        if (mouseX >= left && mouseX <= right) return false;
+        int len = input.getValue().length();
+        int cur = input.getCursorPosition();
+        int step = 1 + (int) (Math.abs(mouseX - (mouseX > right ? right : left)) / 4.0);
+        step = Math.min(step, 8);
+        int target = Mth.clamp(mouseX > right ? cur + step : cur - step, 0, len);
+        if (target == cur) return false;
+        input.moveCursorTo(target, true);
+        return true;
     }
 
     @Override
@@ -3662,7 +3694,8 @@ boolean showAvatar = !(ChatBubbleClientSetup.config().hideRepeatedAvatars() != n
             }
             if (!parsed.images().isEmpty()) {
                 List<FormattedCharSequence> imgLines = wrapContent(parsed.textWithoutImages(), bubbleMaxW);
-                int textH = imgLines.size() * font.lineHeight;
+                int textH = imgLines.isEmpty() || parsed.textWithoutImages().getString().isBlank() ? 0
+                    : imgLines.size() * font.lineHeight + BUBBLE_PAD_Y * 2 + 2;
                 int imgH = 0;
                 for (var ref : parsed.images()) imgH += imageEdgeHeight(ref.url()) + 2;
                 h = NAME_H + textH + imgH;
@@ -3744,15 +3777,23 @@ boolean showAvatar = !(ChatBubbleClientSetup.config().hideRepeatedAvatars() != n
         com.niuqu.chatbubble.mixin.ChatInputSuggestorAccessor acc = (com.niuqu.chatbubble.mixin.ChatInputSuggestorAccessor) commandSuggestions;
         int fieldX = input.getX();
         int visualW = input.getWidth() + INPUT_CURSOR_RESERVE + INPUT_BOX_OUTSET * 2;
+        int usageW = visualW;
+        java.util.List<net.minecraft.util.FormattedCharSequence> usageLines = acc.getCommandUsage();
+        if (usageLines != null) {
+            for (net.minecraft.util.FormattedCharSequence line : usageLines) {
+                if (line != null) usageW = Math.max(usageW, font.width(line) + 8);
+            }
+        }
         acc.e33chat$setUsageX(fieldX - INPUT_BOX_OUTSET);
-        acc.e33chat$setUsageWidth(visualW);
+        acc.e33chat$setUsageWidth(usageW);
         net.minecraft.client.gui.components.CommandSuggestions.SuggestionsList window = acc.getWindow();
         if (window == null) return;
         net.minecraft.client.renderer.Rect2i area = ((com.niuqu.chatbubble.mixin.SuggestionWindowAccessor) window).getArea();
         if (area == null) return;
-        int newY = suggestionWindowBottom() - area.getHeight();
+        int bottom = suggestionWindowBottom();
+        if (usageLines != null && !usageLines.isEmpty()) bottom -= 12;
+        int newY = bottom - area.getHeight();
         if (area.getX() != fieldX) area.setX(fieldX);
-        if (area.getWidth() != visualW) area.setWidth(visualW);
         if (area.getY() != newY) area.setY(newY);
     }
 
@@ -4079,21 +4120,39 @@ boolean showAvatar = !(ChatBubbleClientSetup.config().hideRepeatedAvatars() != n
         int textX = own ? (avatarX - UiTokens.AVATAR_NAME_GAP - maxTextW) : (avatarX + Appearance.avatarSize() + UiTokens.AVATAR_GAP);
 
         int y = baseY + NAME_H;
-        if (!lines.isEmpty()) {
+        if (!lines.isEmpty() && !parsed.textWithoutImages().getString().isBlank()) {
+            // 图片带说明文字：说明部分必须有自己的气泡边框（纯图片才无气泡）。
+            int bubbleW = Math.min(panelW - PAD * 2, maxTextW + BUBBLE_PAD_X * 2);
+            int bubbleH = lines.size() * font.lineHeight + BUBBLE_PAD_Y * 2;
+            int bubbleX = own ? (avatarX - UiTokens.AVATAR_NAME_GAP - bubbleW)
+                : (avatarX + Appearance.avatarSize() + UiTokens.AVATAR_GAP);
+            int bg = own
+                ? ownBubbleBg()
+                : ChatBubbleConfig.parseHexColor(ChatBubbleClientSetup.config().otherBubbleColor(), c().contextHover());
             int fg = own
-                ? ownBubbleFg(ownBubbleBg())
+                ? ownBubbleFg(bg)
                 : ChatBubbleConfig.parseHexColor(ChatBubbleClientSetup.config().otherTextColor(), c().textPrimary());
+            if (index == searchHighlightIndex) {
+                RoundRectRenderer.fill(g, bubbleX - 1, y - 1, bubbleX + bubbleW + 1, y + bubbleH + 1,
+                    ChatBubbleClientSetup.config().bubbleCornerRadius(), ChatSearchPanel.HIGHLIGHT);
+            }
+            RoundRectRenderer.fill(g, bubbleX, y, bubbleX + bubbleW, y + bubbleH,
+                ChatBubbleClientSetup.config().bubbleCornerRadius(),
+                ChatBubbleTheme.alphaBlend(bg, (int) (255 * alpha)));
             Style fb = findRootClickStyle(msg.content());
             int fgA = ChatBubbleTheme.alphaBlend(fg, (int) (255 * alpha));
             for (int li = 0; li < lines.size(); li++)
-                renderLineWithClicks(g, lines.get(li), textX, y + li * font.lineHeight, fgA, fb,
+                renderLineWithClicks(g, lines.get(li), bubbleX + BUBBLE_PAD_X,
+                    y + BUBBLE_PAD_Y + li * font.lineHeight, fgA, fb,
                     index, li, TextSpan.KIND_CONTENT, 1f);
-            y += lines.size() * font.lineHeight;
+            bubbleRects.add(new int[]{bubbleX, y, bubbleW, bubbleH, index});
+            y += bubbleH + 2;
         }
 
         // Long-edge clamped to the panel's usable width so a narrow window/guiScale
         // can never push the image off-screen; small images keep their real size.
         int maxImgW = imageDisplayMaxWidth();
+        int firstImgX = -1, firstImgY = -1, firstImgW = 0, firstImgH = 0;
 
         for (var ref : parsed.images()) {
             int w = maxImgW, h = maxImgW;
@@ -4107,6 +4166,7 @@ boolean showAvatar = !(ChatBubbleClientSetup.config().hideRepeatedAvatars() != n
                 h = Math.max(1, (int) (entry.height() * ratio));
             }
             int imgX = own ? (avatarX - UiTokens.AVATAR_NAME_GAP - w) : (avatarX + Appearance.avatarSize() + UiTokens.AVATAR_GAP);
+            if (firstImgX < 0) { firstImgX = imgX; firstImgY = y; firstImgW = w; firstImgH = h; }
             if (entry != null && entry.state() == ImageEntry.State.LOADED && entry.textureId() != null) {
                 g.drawTexture(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED, entry.textureId(), imgX, y, 0f, 0f, w, h,
                     entry.width(), entry.height(), entry.width(), entry.height());
@@ -4131,8 +4191,18 @@ boolean showAvatar = !(ChatBubbleClientSetup.config().hideRepeatedAvatars() != n
 
         if (msg.duplicateCount() > 1) {
             String label = "x" + msg.duplicateCount();
-            int lx = own ? (avatarX - UiTokens.AVATAR_NAME_GAP - font.width(label) - 3) : (avatarX + Appearance.avatarSize() + UiTokens.AVATAR_GAP + 3);
-            g.drawText(font, label, lx, baseY + NAME_H + 2,
+            int labelW = font.width(label);
+            int lx, ly;
+            if (firstImgX >= 0) {
+                lx = own ? firstImgX - labelW - 3 : firstImgX + firstImgW + 3;
+                ly = firstImgY + (firstImgH - font.lineHeight) / 2;
+                if (lx < panelX + PAD) lx = firstImgX + firstImgW + 3;
+            } else {
+                lx = own ? (avatarX - UiTokens.AVATAR_NAME_GAP - labelW - 3)
+                    : (avatarX + Appearance.avatarSize() + UiTokens.AVATAR_GAP + 3);
+                ly = baseY + NAME_H + 2;
+            }
+            g.drawText(font, label, lx, ly,
                 ChatBubbleTheme.alphaBlend(c().duplicateLabel(), (int) (255 * alpha)), false);
         }
 
@@ -4636,26 +4706,32 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
         int barW = sendX - 6 - barX;
         int barY = barTop - REPLY_BAR_H - notifOffset;
 
-        float panelBgAlpha = (c().panelBg() >>> 24) / 255f;
-        ColoredTextureRenderer.drawWithAlpha(g, UiTextureManager.rl(UiElement.PANEL_BG),
-            barX, barY, barW, barTop - notifOffset - barY, panelBgAlpha);
-        ColoredTextureRenderer.drawWithAlpha(g, UiTextureManager.rl(UiElement.DIVIDER), barX, barTop - notifOffset - 1, barW, 1, getAnimProgress());
+        int a255 = (int) (255 * getAnimProgress());
+        RoundRectRenderer.panel(g, barX, barY, barW, barTop - notifOffset - barY, 7f,
+            ChatBubbleTheme.alphaBlend(c().popupBg(), a255),
+            ChatBubbleTheme.alphaBlend(c().divider(), a255));
 
         String sender = target.senderName().getString();
         if (sender.isEmpty()) sender = Component.translatable("e33chat.sender.system").getString();
-        String preview = sender + ": " + target.content().getString();
-        int maxW = barW - 24;
-        String display = font.plainSubstrByWidth(preview, maxW - font.width("..."));
-        if (!display.equals(preview)) display += "...";
-        g.drawText(font, display, barX + 6, barY + 4, c().textSecondary(), false);
+        String preview = sender + ": " + quoteDisplay(target);
+        int maxW = barW - 30;
+        String display = ellipsize(preview, maxW);
+        g.drawText(font, display, barX + 6, barY + (REPLY_BAR_H - font.lineHeight) / 2,
+            c().textSecondary(), false);
 
         int cx = barX + barW - 16;
         int cy = barY + 3;
         boolean hoverX = mouseX >= cx && mouseX <= cx + 12 && mouseY >= cy && mouseY <= cy + 12;
-        int xBg = hoverX ? c().closeHoverBg() : c().sidebarItemSelected();
-        ColoredTextureRenderer.drawWithAlpha(g, UiTextureManager.rl(hoverX ? UiElement.CLOSE_HOVER : UiElement.SIDEBAR_SELECTED),
-            cx, cy, 12, 12, getAnimProgress());
-        g.drawText(font, "✕", cx + 6 - font.width("✕") / 2, cy + 2, c().closeText(), false);
+        RoundRectRenderer.fill(g, cx, cy, cx + 12, cy + 12, 5f,
+            ChatBubbleTheme.alphaBlend(c().textMuted(), a255));
+        RoundRectRenderer.fill(g, cx + 1, cy + 1, cx + 11, cy + 11, 4f,
+            ChatBubbleTheme.alphaBlend(c().inputBg(), a255));
+        if (hoverX) {
+            RoundRectRenderer.fill(g, cx + 1, cy + 1, cx + 11, cy + 11, 4f,
+                ChatBubbleTheme.alphaBlend(c().popupHover(), a255));
+        }
+        g.drawText(font, "✕", cx + (12 - font.width("✕")) / 2,
+            cy + (12 - font.lineHeight) / 2, c().closeText(), false);
     }
 
     private boolean isMouseOverReplyCancel(double mx, double my) {
@@ -5404,6 +5480,23 @@ if (cmpLogged < 3 && quoteSenderMatches(m, owner.replySender())) {
             });
     }
 
+    /** 粘贴/重发整条图片消息：文本里有 CICode 时走图片载荷，不能当普通聊天（256 上限会截断）。 */
+    private boolean sendPastedImages(String raw) {
+        BracketCodec.ParseResult parsed = BracketCodec.parse(Component.literal(raw));
+        if (parsed.images().isEmpty() || parsed.images().size() > ImageMessageComposer.MAX_IMAGES) return false;
+        java.util.List<String> urls = new java.util.ArrayList<>();
+        for (BracketCodec.ImageRef ref : parsed.images()) {
+            if (ref.emote() || ref.url().startsWith("file://")) return false;
+            urls.add(ref.url());
+        }
+        String caption = parsed.textWithoutImages().getString().trim();
+        if (caption.startsWith("/")) return false;
+        input.setValue("");
+        savedInput = "";
+        sendImageBatchOrPayload(caption, urls);
+        return true;
+    }
+
     private void sendMessage() {
         if (imageComposer.hasFiles()) {
             sendPendingImages();
@@ -5432,6 +5525,9 @@ if (cmpLogged < 3 && quoteSenderMatches(m, owner.replySender())) {
             raw = input.getValue().trim();
             if (raw.isEmpty()) return;
         }
+        // 复制图片消息后直接粘贴重发：多个 CICode 必须走 image_message 载荷，
+        // 普通聊天通道的 256 字符上限正是“只显示前 4 张”的原因。
+        if (sendPastedImages(raw)) return;
         if (raw.contains("[[CICode,url=file://")) {
             // A local file:// CICode (chatimage's drag/paste handler inserts
             // these) is a local-only broken link. Queue our own upload and

@@ -14,4 +14,8 @@ public interface ChatInputSuggestorAccessor {
 
     @Accessor("commandUsageWidth")
     void e33chat$setUsageWidth(int w);
+
+    /** 当前用法/报错提示行；空 = 没有提示行。 */
+    @Accessor("commandUsage")
+    java.util.List<net.minecraft.util.FormattedCharSequence> getCommandUsage();
 }
