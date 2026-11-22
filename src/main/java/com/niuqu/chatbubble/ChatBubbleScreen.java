@@ -596,9 +596,9 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
     /** 输入框宽度里给「光标」预留的一个字母宽度（长文本时光标会被 clamp 到文本区右缘）。 */
     private static final int INPUT_CURSOR_RESERVE = 6;
     /** 输入框右侧给「展开编辑」箭头预留的宽度；箭头只画 ^，不要竖杆。 */
-    private static final int INPUT_EDITOR_RESERVE = 14;
+    private static final int INPUT_EDITOR_RESERVE = 10;
     /** 输入框右上角圆形展开按钮直径（同时是输入框文字区右侧预留量）。 */
-    private static final int INPUT_EDITOR_BTN_S = 14;
+    private static final int INPUT_EDITOR_BTN_S = 9;
     private static final int INPUT_EDITOR_MAX_H = 160;
 
     /** 输入框宽度的唯一算法（窄窗口下不能算出 0/负值，见 {@link #MIN_INPUT_W}）。 */
@@ -5327,12 +5327,13 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
             hoverEditorArrow ? c().nameColor() : c().textMuted(), a255);
         int arrowBg = ChatBubbleTheme.alphaBlend(c().inputBg(), a255);
         RoundRectRenderer.fill(g, ar[0] - 1, ar[1] - 1, ar[0] + ar[2] + 1, ar[1] + ar[3] + 1,
-            8f, arrowBorder);
-        RoundRectRenderer.fill(g, ar[0], ar[1], ar[0] + ar[2], ar[1] + ar[3], 7f, arrowBg);
+            5.5f, arrowBorder);
+        RoundRectRenderer.fill(g, ar[0], ar[1], ar[0] + ar[2], ar[1] + ar[3], 4.5f, arrowBg);
         int arrowColor = ChatBubbleTheme.alphaBlend(
             hoverEditorArrow ? c().nameColor() : c().textMuted(), a255);
         g.getMatrices().pushMatrix();
         g.getMatrices().translate(ar[0] + ar[2] / 2f, ar[1] + ar[3] / 2f);
+        g.getMatrices().scale(0.8f, 0.8f);
         g.drawText(font, "^", -font.width("^") / 2, -font.lineHeight / 2, arrowColor, false);
         g.getMatrices().popMatrix();
     }
