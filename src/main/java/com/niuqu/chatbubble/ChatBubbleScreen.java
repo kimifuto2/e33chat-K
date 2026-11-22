@@ -419,6 +419,8 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
     private int replyTargetIndex = -1;
     /** 最近一次鼠标拖拽/按下位置：用于按住不动时每 tick 继续横向自动滚动选字。 */
     private double lastInputDragX, lastInputDragY;
+    /** 只有真正发生过 mouseDragged 才允许 tick 自动滚选；单击也会 setDragging(true)。 */
+    private boolean inputDragMoved;
     private int copyToastTicks;
 
     private long animStart;
@@ -1806,6 +1808,9 @@ if (this.getFocused() != null && this.getFocused().keyPressed(input))
 
     @Override
     public boolean mouseClicked(MouseButtonEvent click, boolean doubleClick) {
+        lastInputDragX = click.x();
+        lastInputDragY = click.y();
+        inputDragMoved = false;
         if (imageViewer.visible) return imageViewer.mouseClicked(click, doubleClick, width, height);
         double mouseX = click.x();
         double mouseY = click.y();
@@ -2284,6 +2289,7 @@ TextSpan hit = (mouseY >= msgTop && mouseY <= msgBottom) ? findSelectionSpanAt(m
     public boolean mouseDragged(MouseButtonEvent click, double dragX, double dragY) {
         lastInputDragX = click.x();
         lastInputDragY = click.y();
+        inputDragMoved = true;
         if (imageViewer.visible) return imageViewer.mouseDragged(click, width, height);
         // 群聊模态层优先：拖拽只用于模态输入框的拖选，不能变成聊天记录的选区/滚动条拖动
         if (activeGroupModal != null) {
@@ -2343,7 +2349,7 @@ if (quotePressPending
 
     /** 按住鼠标停在输入框边缘时，每 tick 继续推进光标（不依赖下一次 mouseDragged 事件）。 */
     private void tickInputDragScroll() {
-        if (!isDragging() || lastInputDragX == 0 && lastInputDragY == 0) return;
+        if (!inputDragMoved || !isDragging() || lastInputDragX == 0 && lastInputDragY == 0) return;
         handleInputDragScroll(lastInputDragX, lastInputDragY);
     }
 
@@ -2368,6 +2374,7 @@ if (quotePressPending
 
     @Override
     public boolean mouseReleased(MouseButtonEvent click) {
+        inputDragMoved = false;
         if (imageViewer.visible) return imageViewer.mouseReleased();
         // 群聊模态层优先：释放只用于模态输入框结束拖选
         if (activeGroupModal != null) {
@@ -5588,6 +5595,18 @@ if (cmpLogged < 3 && quoteSenderMatches(m, owner.replySender())) {
                 ChatMessageStore.debugLog("[e33chat] upload block | queued=" + uploadQueue.pending() + " | raw=" + raw);
             } else {
                 minecraft.player.sendSystemMessage(Component.translatable("e33chat.upload.queue_full"));
+            }
+            return;
+        }
+        // 原版 ServerboundChatPacket 的字符串上限是 256；输入框放宽到 4096 只是为了粘贴
+        // 多张图片代码，普通聊天/指令仍必须先拦截，否则 Netty 编码异常会直接断线。
+        int maxChat = isGroupConversation() ? 480 : 256;
+        if (whisperPartner != null && !raw.startsWith("/")) {
+            maxChat = Math.max(32, maxChat - ("/msg " + whisperPartner + " ").length());
+        }
+        if (raw.length() > maxChat) {
+            if (minecraft.player != null) {
+                ChatMessageStore.addLocalNotice(Component.translatable("e33chat.chat.too_long", maxChat), whisperPartner);
             }
             return;
         }
