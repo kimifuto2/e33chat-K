@@ -743,10 +743,11 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
     /** 搜索框内文字的左侧缩进（相对搜索框左缘 sbx）。加描边后内壁比原来内缩 1px，
      *  这里再留 2px 内边距，文字/占位符与描边之间才不会贴死 —— 字段 x 与占位符 x 共用这个值。 */
     private static final int SIDEBAR_SEARCH_TEXT_INSET = 2;
-    /** 「+」新建群聊按钮：与搜索框同高、右对齐；圆角/描边与其它图标按钮同一套（6/5）。
-     *  尺寸 16px（原 14px 的加号笔画太细、也太小）：按钮 [71, 87]，搜索框 [2, 16]，
-     *  二者顶边都在 y=5，与右侧标题栏按钮同一水平基线。 */
-    private static final int SIDEBAR_ADD_S = 15;
+    /** 「+」新建群聊按钮：右对齐；圆角/描边与其它图标按钮同一套（6/5）。
+     *  **尺寸必须为偶数**：加号用 fill 的整数像素画，15px 按钮的几何中心落在 x.5/y.5，
+     *  十字必然偏左上 0.5px（用户看到的就是"不居中"）；16px 按钮中心是整数，横竖条严格对称。
+     *  按钮 [71, 87]，顶边 y=5，与右侧标题栏按钮同一水平基线。 */
+    private static final int SIDEBAR_ADD_S = 16;
     private static final int SIDEBAR_ADD_X = SIDEBAR_W - 1 - 2 - SIDEBAR_ADD_S;
     private static final int SIDEBAR_ADD_Y = 5;
     /** 群聊行高 **28px**（用户选的 B 方案：只把群行加高，好让九宫格头像更大更清晰）。
