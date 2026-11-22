@@ -271,7 +271,7 @@ java.lang.IllegalStateException: Cannot register channel. Too many channel regis
 | 文件 | 大小 |
 |---|---|
 | `build/libs/e33chat-Fabric-1.21.11-3.2.1.jar` | 748,828 B |
-| `build/libs/e33chat-Fabric-1.21.11-3.2.1-sources.jar` | 522,356 B |
+| `build/libs/e33chat-Fabric-1.21.11-3.2.1-sources.jar` | 522,352 B |
 
 ---
 
