@@ -5036,7 +5036,7 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
         beginPopupClose(s -> inputEditorCloseStart = s, () -> inputEditorOpen = false);
     }
 
-    /** 回车/完成：把面板 buffer 写回原输入框，然后立即走正常发送流程。 */
+    /** 回车/完成：只把面板 buffer 写回原输入框，不自动发送。 */
     private void commitInputEditor() {
         if (!inputEditorOpen) return;
         String text = inputEditorText;
@@ -5046,7 +5046,6 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
         input.setValue(text.replace('\n', ' ').replace('\r', ' '));
         setFocused(input);
         input.moveCursorToEnd(false);
-        sendMessage();
     }
 
     private boolean isMouseOverInputEditorArrow(double mx, double my) {
@@ -5240,7 +5239,7 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
         g.drawText(font, done, d[0] + (d[2] - font.width(done)) / 2,
             d[1] + (d[3] - font.lineHeight) / 2,
             ChatBubbleTheme.alphaBlend(c().textPrimary(), a255), false);
-        String hint = "Enter 发送";
+        String hint = "Enter 写回";
         g.drawText(font, hint, contentX, d[1] + (d[3] - font.lineHeight) / 2,
             ChatBubbleTheme.alphaBlend(c().textMuted(), a255), false);
     }
