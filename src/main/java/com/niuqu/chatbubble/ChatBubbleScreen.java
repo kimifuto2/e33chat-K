@@ -500,7 +500,7 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
         commandSuggestions.refresh();
 
 
-        sidebarSearchBox = new TextFieldWidget(textRenderer, 2 + SIDEBAR_SEARCH_TEXT_INSET, 2,
+        sidebarSearchBox = new TextFieldWidget(textRenderer, 2 + SIDEBAR_SEARCH_TEXT_INSET, 8,
             SIDEBAR_SEARCH_W - 6, SIDEBAR_SEARCH_H, Text.literal(""));
         sidebarSearchBox.setMaxLength(20);
         sidebarSearchBox.setDrawsBackground(false);
@@ -729,19 +729,24 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
         rebuildLayout();
     }
 
-    private static final int SIDEBAR_SEARCH_H = 23;
+    private static final int SIDEBAR_SEARCH_H = 15;
+    /** 搜索框顶边：与右侧标题栏的 menu/DND/close 按钮同一条水平基线。 */
+    private static final int SIDEBAR_SEARCH_Y = 5;
+    /** 输入文字/占位符的顶边：no-background TextFieldWidget 的 textY=getY()，
+     *  所以 widget 的 y 必须直接等于这里；框内 (15-8)/2 = 3px 上下留白。 */
+    private static final int SIDEBAR_SEARCH_TEXT_Y = 8;
     /** 侧边栏搜索框宽度：**缩短**让位给「+」按钮，但两者要挨紧——
      *  行内布局（侧边栏宽 90、右侧 1px 分隔线、左右各留 2px 边距）：
      *  搜索框 [1, 2+64]，「+」按钮 [71, 87]，两者间距 5px，右侧到分隔线 2px。
-     *  高度 23：外框从 y=2 画到 y=24，和右侧标题栏 DIVIDER（titleY+TITLE_H=24）同一条下边框。 */
+     *  高度 15：只保留输入框自身高度，不再拉满整个标题栏；文字/占位符在框内垂直居中。 */
     private static final int SIDEBAR_SEARCH_W = 64;
     /** 搜索框内文字的左侧缩进（相对搜索框左缘 sbx）。加描边后内壁比原来内缩 1px，
      *  这里再留 2px 内边距，文字/占位符与描边之间才不会贴死 —— 字段 x 与占位符 x 共用这个值。 */
     private static final int SIDEBAR_SEARCH_TEXT_INSET = 2;
     /** 「+」新建群聊按钮：与搜索框同高、右对齐；圆角/描边与其它图标按钮同一套（6/5）。
      *  尺寸 16px（原 14px 的加号笔画太细、也太小）：按钮 [71, 87]，搜索框 [2, 16]，
-     *  二者中心线都在 y=13，视觉上是一条整齐的行。 */
-    private static final int SIDEBAR_ADD_S = 16;
+     *  二者顶边都在 y=5，与右侧标题栏按钮同一水平基线。 */
+    private static final int SIDEBAR_ADD_S = 15;
     private static final int SIDEBAR_ADD_X = SIDEBAR_W - 1 - 2 - SIDEBAR_ADD_S;
     private static final int SIDEBAR_ADD_Y = 5;
     /** 群聊行高 **28px**（用户选的 B 方案：只把群行加高，好让九宫格头像更大更清晰）。
@@ -775,9 +780,10 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
      *  第 5 轮：群免打扰的紫月亮改成画在**这里**（与私聊行「🌙 名字」一致），群名右移到
      *  {@code 30 + 9 + 2 = 41}（与私聊行的 {@code 22 + 9 + 2 = 33} 同一套算法，见 renderGroupRow）。 */
     private static final int GROUP_NAME_X = 30;
-    /** 侧边栏玩家列表可见区顶部 Y：搜索框（2+23）+ 世界频道行（22）+ 2 间隔。
+    /** 侧边栏玩家列表可见区顶部 Y：世界频道行从 TITLE_H+1 开始（与右侧消息区同一条线），
+     *  世界频道行（22）+ 2 间隔。搜索框本体的 15px 高度只影响自身，不再撑大这一段。
      *  绘制与点击命中共用这一个值，滚动夹紧也用它算可见高度。 */
-    private static final int SIDEBAR_LIST_TOP = 2 + SIDEBAR_SEARCH_H + SIDEBAR_ITEM_H + 2;
+    private static final int SIDEBAR_LIST_TOP = (TITLE_H + 1) + SIDEBAR_ITEM_H + 2;
 
     private void renderSidebar(DrawContext g, int mouseX, int mouseY, float alpha) {
         ColoredTextureRenderer.drawWithAlpha(g, UiTextureManager.rl(UiElement.SIDEBAR_BG), 0, 0, SIDEBAR_W, height, alpha);
@@ -790,7 +796,7 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
         int itemH = SIDEBAR_ITEM_H;
 
         int sbx = 2;
-        int sby = 2;
+        int sby = SIDEBAR_SEARCH_Y;
         int sbw = SIDEBAR_SEARCH_W;
         int sbh = SIDEBAR_SEARCH_H;
         // 搜索框：**1px 圆角描边**（外层圆角 5 / 内层圆角 4，与 GroupUi.fieldBox 同一套弧度），
@@ -809,13 +815,13 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
                 ChatBubbleTheme.alphaBlend(c().popupHover(), searchA));
         if (sidebarSearchBox.getText().isEmpty() && !sidebarSearchBox.isFocused()) {
             g.drawText(textRenderer, Text.translatable("e33chat.sidebar.search").getString(),
-                sbx + SIDEBAR_SEARCH_TEXT_INSET, sby + (sbh - 8) / 2, c().textMuted(), false);
+                sbx + SIDEBAR_SEARCH_TEXT_INSET, SIDEBAR_SEARCH_TEXT_Y, c().textMuted(), false);
         }
         // 「+」新建群聊：右对齐圆角按钮（描边 6 / 内层 5，与聊天面板其它图标按钮同一套弧度）
         // 可用性判定只有一份：groupAddUsable()（绘制置灰 / 悬停高亮 / 点击命中全走它）
         drawGroupAddButton(g, SIDEBAR_ADD_X, SIDEBAR_ADD_Y, SIDEBAR_ADD_S, alpha,
             isMouseOverGroupAdd(mouseX, mouseY), groupAddUsable());
-        y = sby + sbh;
+        y = TITLE_H + 1;
 
         boolean isPublic = whisperPartner == null;
         boolean hoverTab = mouseX >= 0 && mouseX <= SIDEBAR_W && mouseY >= y && mouseY <= y + itemH;
@@ -1871,7 +1877,7 @@ if (this.getFocused() != null && this.getFocused().keyPressed(input))
         int sidebarX = getSidebarScreenX();
         if ((sidebarOpen || sidebarAnimating) && button == 0 && origX >= sidebarX && origX <= sidebarX + SIDEBAR_W) {
             // 搜索框那一行的命中带：覆盖搜索框本体（含外框圆角），也覆盖「+」按钮。
-            int searchY = 2;
+            int searchY = SIDEBAR_SEARCH_Y;
             int searchH = SIDEBAR_SEARCH_H;
             // 侧边栏本地坐标（滑动过程中 origX 与本地 x 差一个 sidebarX）
             double localX = origX - sidebarX;
@@ -1884,7 +1890,7 @@ if (this.getFocused() != null && this.getFocused().keyPressed(input))
                     return true;
                 }
                 if (localX >= 1 && localX <= 2 + SIDEBAR_SEARCH_W
-                    && mouseY >= 2 && mouseY < 2 + SIDEBAR_SEARCH_H) {
+                    && mouseY >= SIDEBAR_SEARCH_Y && mouseY < SIDEBAR_SEARCH_Y + SIDEBAR_SEARCH_H) {
                     sidebarSearchBox.mouseClicked(click, doubleClick);
                     setFocused(sidebarSearchBox);
                     if (button == 0) setDragging(true);
@@ -1894,7 +1900,7 @@ if (this.getFocused() != null && this.getFocused().keyPressed(input))
             }
             if (sidebarSearchBox.isFocused()) setFocused(chatField);
 
-            int y2 = 2 + SIDEBAR_SEARCH_H;
+            int y2 = TITLE_H + 1;
             if (mouseY >= y2 && mouseY <= y2 + SIDEBAR_ITEM_H) {
                 enterConversation(null); return true;
             }
@@ -2934,7 +2940,9 @@ boolean selDrag = textSelection.isDragActive();
     }
 
     private int titleCloseOuterX() { return panelX + panelW - 6 - (ICON_S + 1); }
-    private int titleCloseOuterY() { return titleY + (TITLE_H - (ICON_S + 1)) / 2; }
+    /** 标题栏按钮统一基线：15px 外框放在 y=5（与侧边栏搜索框同一顶边），
+     *  不再用 floor 居中的 y=4，否则侧边栏搜索框和关闭键会差 1px。 */
+    private int titleCloseOuterY() { return titleY + (TITLE_H - (ICON_S + 1) + 1) / 2; }
     private int titleGearOuterX() { return titleCloseOuterX() - 4 - (ICON_S + 1); }
 
     private int titleCloseX() { return panelX + panelW - 6 - TITLE_BTN_W; }
