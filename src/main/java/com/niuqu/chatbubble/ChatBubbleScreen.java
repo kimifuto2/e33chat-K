@@ -179,7 +179,9 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
      * 输入框本体 top = {@link #getInputY()}，外框 top = 本体 top - {@link #INPUT_BOX_OUTSET}。
      */
     public static int suggestionWindowBottom() {
-        return inputY - INPUT_BOX_OUTSET - 1;
+        // 候选列表下方还有 12px 的用法/报错提示行（extractUsage）；列表底边必须抬到
+        // 提示行上方，否则不透明的提示行底框会把整个候选列表盖住（看起来就是“候选框消失”）。
+        return inputY - INPUT_BOX_OUTSET - 14;
     }
 
     /**
@@ -217,7 +219,7 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
     final ImageViewerOverlay imageViewer = new ImageViewerOverlay();
     private final List<ImageHit> imageHits = new ArrayList<>();
 
-    private record ImageHit(String url, int x, int y, int w, int h) {}
+    private record ImageHit(String url, int x, int y, int w, int h, int messageIndex) {}
     final ChatSettingsMenu settingsMenu = new ChatSettingsMenu();
     final ChatSearchPanel searchPanel = new ChatSearchPanel();
     private TextFieldWidget searchInput;
@@ -2090,6 +2092,18 @@ quickChatInput.setVisible(true);
             }
         }
 
+        // Image right-click: image messages are bubble-less, so the normal bubble
+        // hit-test never covers the picture. Open the same copy/quote context menu.
+        if (button == 1) {
+            ImageHit ih = imageAt(mouseX, mouseY);
+            if (ih != null && ih.messageIndex() >= 0) {
+                contextMsgIndex = ih.messageIndex();
+                contextX = (int) mouseX;
+                contextY = (int) mouseY;
+                return true;
+            }
+        }
+
         // Avatar right-click → 玩家互动动作菜单（拍了拍等；8 个动作 + 末尾「自定义」）。
         // 命中矩形与消息气泡同源（每帧渲染回填的 bubbleRects），所以滚动/消息动画后仍然准。
         // 需求：公屏 / 群聊 / 私聊三种会话都支持 —— 这三种视图走的是同一套渲染，
@@ -2183,7 +2197,19 @@ TextSpan hit = (mouseY >= msgTop && mouseY <= msgBottom) ? findSelectionSpanAt(m
 // （setFocused(命中的子控件) + setDragging(true)）。漏了这两步 ?screen.isDragging()
         // 恒为 false  ?ParentElement.mouseDragged 直接 return  ?TextFieldWidget 永远收不
 // mouseDragged  ?鼠标拖选（以及依赖选区的复 ?粘贴/整段删除）全部失效
-boolean inputHandled = this.chatField.mouseClicked(click, doubleClick);
+        boolean inputVisualHit = mouseX >= inputBaseX() - INPUT_BOX_OUTSET
+            && mouseX <= inputBaseX() + chatField.getWidth() + INPUT_CURSOR_RESERVE + INPUT_BOX_OUTSET
+            && mouseY >= inputBarY() - INPUT_BOX_OUTSET
+            && mouseY <= inputBarY() + INPUT_H + INPUT_BOX_OUTSET;
+        boolean inputHandled = this.chatField.mouseClicked(click, doubleClick);
+        if (!inputHandled && inputVisualHit && button == 0) {
+            // 视觉底板右侧比 chatField 宽（光标 reserve + 描边）；原版会判“未命中”，这里补起点，
+            // 让从最右侧开始拖选时能选中最后几个字符。
+            setFocused(chatField);
+            chatField.setCursorToEnd(false);
+            setDragging(true);
+            return true;
+        }
         if (inputHandled && button == 0) {
             setFocused(chatField);
             setDragging(true);
@@ -2476,6 +2502,29 @@ boolean selDrag = textSelection.isDragActive();
         return CTX_ITEM_H * contextMenuItemCount() + 2;
     }
 
+    /** 图片消息复制成**可重新解析的代码**：去掉换行/格式，图片用 CICode、表情用 E33Emote。 */
+    private static String copyPayload(ChatMessageStore.ChatMessage msg) {
+        if (msg == null) return "";
+        BracketCodec.ParseResult parsed = BracketCodec.parse(msg.content());
+        if (parsed.images().isEmpty()) return msg.content().getString();
+        StringBuilder sb = new StringBuilder(parsed.textWithoutImages().getString().trim());
+        for (BracketCodec.ImageRef ref : parsed.images()) {
+            if (sb.length() > 0) sb.append(' ');
+            sb.append(ref.emote() ? "[[E33Emote,url=" : "[[CICode,url=").append(ref.url()).append("]]");
+        }
+        return sb.toString();
+    }
+
+    /** 引用图片消息时显示 [图片]（可附说明），不要把整段 e33chat:// URL 塞进引用块。 */
+    private static String quoteDisplay(ChatMessageStore.ChatMessage msg) {
+        if (msg == null) return "";
+        BracketCodec.ParseResult parsed = BracketCodec.parse(msg.content());
+        if (parsed.images().isEmpty()) return ChatMessageStore.singleLine(msg.content().getString());
+        String caption = parsed.textWithoutImages().getString().trim();
+        String mark = Text.translatable("e33chat.image.placeholder").getString();
+        return caption.isEmpty() ? mark : mark + " " + caption;
+    }
+
     private void handleContextClick(int mx, int my) {
         int items = contextMenuItemCount();
         int menuH = contextMenuHeight();
@@ -2485,7 +2534,7 @@ boolean selDrag = textSelection.isDragActive();
         if (mx >= menuX && mx <= menuX + CTX_W) {
             if (my >= menuY && my <= menuY + CTX_ITEM_H) {
                 ChatMessageStore.ChatMessage msg = ChatMessageStore.getMessageAt(contextMsgIndex);
-                if (msg != null) { client.keyboard.setClipboard(msg.content().getString()); copyToastTicks = 30; }
+                if (msg != null) { client.keyboard.setClipboard(copyPayload(msg)); copyToastTicks = 30; }
             } else if (items > 1 && my >= menuY + CTX_ITEM_H + 1 && my <= menuY + CTX_ITEM_H * 2 + 1) {
                 replyTargetIndex = contextMsgIndex;
             }
@@ -2847,8 +2896,10 @@ boolean selDrag = textSelection.isDragActive();
         ChatInputSuggestorAccessor acc = (ChatInputSuggestorAccessor) commandSuggestions;
         int fieldX = chatField.getX();
         int fieldW = chatField.getWidth();
-        acc.e33chat$setSuggestX(fieldX);
-        acc.e33chat$setSuggestWidth(fieldW);
+        int visualW = fieldW + INPUT_CURSOR_RESERVE + INPUT_BOX_OUTSET * 2;
+        // 1.21.11 的 ChatInputSuggestor 用同一组 x/width 同时定位候选窗和用法提示行。
+        acc.e33chat$setSuggestX(fieldX - INPUT_BOX_OUTSET);
+        acc.e33chat$setSuggestWidth(visualW);
 
         ChatInputSuggestor.SuggestionWindow window = acc.getWindow();
         if (window == null) return;
@@ -2856,6 +2907,7 @@ boolean selDrag = textSelection.isDragActive();
         if (area == null) return;
         int newY = suggestionWindowBottom() - area.getHeight();
         if (area.getX() != fieldX) area.setX(fieldX);
+        if (area.getWidth() != visualW) area.setWidth(visualW);
         if (area.getY() != newY) area.setY(newY);
     }
 
@@ -4099,7 +4151,7 @@ boolean showAvatar = !(ChatBubbleClientSetup.config().hideRepeatedAvatars() != n
             Style st = Style.EMPTY
                 .withClickEvent(new ClickEvent.OpenUrl(java.net.URI.create(ref.url())));
             clickableSpans.add(new ClickableSpan(imgX, y, w, h, st));
-            imageHits.add(new ImageHit(ref.url(), imgX, y, w, h));
+            imageHits.add(new ImageHit(ref.url(), imgX, y, w, h, index));
             y += h + 2;
         }
 
@@ -5363,12 +5415,27 @@ if (cmpLogged < 3 && quoteSenderMatches(m, owner.replySender())) {
         if (line.length() > 0) sendMessageText(line.toString());
     }
 
+    /** 复制/粘贴可能把长 URL 折成多行：把 CICode/E33Emote 括号内的空白去掉再交给解析器。 */
+    private static String normalizeImageCodeWhitespace(String s) {
+        if (s == null || !s.contains("[[")) return s;
+        return java.util.regex.Pattern.compile("\\[\\[([^\\]]*)\\]\\]",
+                java.util.regex.Pattern.DOTALL)
+            .matcher(s)
+            .replaceAll(m -> {
+                String inner = m.group(1);
+                if (inner.startsWith("CICode,") || inner.startsWith("E33Emote,")) {
+                    inner = inner.replaceAll("\\s+", "");
+                }
+                return "[[" + inner + "]]";
+            });
+    }
+
     private void sendMessage() {
         if (imageComposer.hasFiles()) {
             sendPendingImages();
             return;
         }
-        String raw = chatField.getText().trim();
+        String raw = normalizeImageCodeWhitespace(chatField.getText().trim());
         if (raw.isEmpty()) return;
         // 已选动作（拍了拍等）：前缀在**输入框文本里**（`【拍了拍】正文`），发送时按文本形态
         // 剥离前缀 —— 前缀被玩家退格删掉/挪到中间时它就不再是动作，退回普通聊天（这里顺手
@@ -5459,7 +5526,7 @@ if (cmpLogged < 3 && quoteSenderMatches(m, owner.replySender())) {
                     quoteTargetValid = true;
                     String quoteSender = (target.rawPlayerName() != null && !target.rawPlayerName().isEmpty())
                         ? target.rawPlayerName() : target.senderName().getString();
-                    String quoted = ChatMessageStore.singleLine(target.content().getString());
+                    String quoted = quoteDisplay(target);
                     // 被引用消息的跨客户端指纹：服务端会原样广播，别人双击我这条的引用块时
                     // 靠它在全量消息里精确定位原文（src=hash）。必须用「明文去 § 码」算，
                     // 否则自己带 &颜色码的本地气泡与别人看到的内容算出的值不一致。
@@ -5592,7 +5659,7 @@ if (cmpLogged < 3 && quoteSenderMatches(m, owner.replySender())) {
                 String quoteSender = (target.rawPlayerName() != null && !target.rawPlayerName().isEmpty())
                     ? target.rawPlayerName() : target.senderName().getString();
                 ChatMessageStore.setPendingReply(
-                    ChatMessageStore.singleLine(target.content().getString()), quoteSender);
+                    quoteDisplay(target), quoteSender);
             }
             replyTargetIndex = -1;
         }

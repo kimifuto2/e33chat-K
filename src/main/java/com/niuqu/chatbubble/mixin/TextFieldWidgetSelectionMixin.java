@@ -55,9 +55,11 @@ public abstract class TextFieldWidgetSelectionMixin {
         String selected = text.substring(Math.min(from, text.length()), end);
         int x1 = textX + textRenderer.getWidth(before);
         int x2 = textX + textRenderer.getWidth(before + selected);
-        int right = textX + ((TextFieldWidget) (Object) this).getWidth();
-        x1 = Math.max(textX, x1);
-        x2 = Math.min(right, x2);
+        // 用输入框自己的屏幕边界夹住选中条（长指令/URL 全选时 textX 可能已横向滚动）。
+        int left = ((TextFieldWidget) (Object) this).getX();
+        int right = left + ((TextFieldWidget) (Object) this).getWidth();
+        x1 = Math.max(left, Math.min(right, x1));
+        x2 = Math.max(left, Math.min(right, x2));
         if (x2 <= x1) return;
         // 与原版 drawSelection 的矩形一致：textY - 1 .. textY + 9
         // 与消息区选中一致：选中色与强调色各半（暗色主题的纯选中色近黑，会像黑块）
