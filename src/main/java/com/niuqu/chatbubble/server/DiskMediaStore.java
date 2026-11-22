@@ -147,21 +147,32 @@ public final class DiskMediaStore {
         }
     }
 
-    private static final int RATE_LIMIT_PER_WINDOW = 4;
+    // 多图消息一次最多 9 张：上传 9 次 + 取回 9 次，原来的「上传/下载共用一个
+    // 4 次/10 秒桶」在 3 张图时就会把后续下载全部拒掉（表现为部分/全部图片失败）。
+    // 上传与下载分开计数，并给足单条 9 图消息的预算。
+    private static final int RATE_LIMIT_UPLOADS_PER_WINDOW = 16;
+    private static final int RATE_LIMIT_FETCHES_PER_WINDOW = 32;
     private static final long RATE_WINDOW_MS = 10_000;
-    private final Map<String, java.util.ArrayDeque<Long>> rateWindows = new ConcurrentHashMap<>();
+    private final Map<String, java.util.ArrayDeque<Long>> uploadWindows = new ConcurrentHashMap<>();
+    private final Map<String, java.util.ArrayDeque<Long>> fetchWindows = new ConcurrentHashMap<>();
 
-    /**
-     * Per-player sliding-window throttle for media transfers (one upload session
-     * or one download request = one call). Call once per upload session (index 0),
-     * not per chunk.
-     */
-    public boolean allowTransfer(String playerName) {
+    /** 一次上传会话（index=0）放行一次；与下载预算互不占用。 */
+    public boolean allowUpload(String playerName) {
+        return allow(uploadWindows, playerName, RATE_LIMIT_UPLOADS_PER_WINDOW);
+    }
+
+    /** 一次下载请求放行一次；与上传预算互不占用。 */
+    public boolean allowFetch(String playerName) {
+        return allow(fetchWindows, playerName, RATE_LIMIT_FETCHES_PER_WINDOW);
+    }
+
+    private static boolean allow(Map<String, java.util.ArrayDeque<Long>> windows,
+                                 String playerName, int limit) {
         long now = System.currentTimeMillis();
-        java.util.ArrayDeque<Long> q = rateWindows.computeIfAbsent(playerName, k -> new java.util.ArrayDeque<>());
+        java.util.ArrayDeque<Long> q = windows.computeIfAbsent(playerName, k -> new java.util.ArrayDeque<>());
         synchronized (q) {
             while (!q.isEmpty() && now - q.peekFirst() > RATE_WINDOW_MS) q.removeFirst();
-            if (q.size() >= RATE_LIMIT_PER_WINDOW) return false;
+            if (q.size() >= limit) return false;
             q.addLast(now);
             return true;
         }
