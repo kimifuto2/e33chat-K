@@ -326,7 +326,7 @@ gradle build
 | 文件 | 大小 |
 |---|---|
 | `build/libs/e33chat-Fabric-26.2-3.2.1.jar` | 752,241 B |
-| `build/libs/e33chat-Fabric-26.2-3.2.1-sources.jar` | 523,564 B |
+| `build/libs/e33chat-Fabric-26.2-3.2.1-sources.jar` | 523,571 B |
 
 ---
 
