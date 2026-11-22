@@ -5192,6 +5192,7 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
                 return true;
             }
             if (key == com.mojang.blaze3d.platform.InputConstants.KEY_V) {
+                if (pasteImageCodesFromClipboard()) return true;
                 inputEditorInsert(minecraft.keyboardHandler.getClipboard());
                 return true;
             }
