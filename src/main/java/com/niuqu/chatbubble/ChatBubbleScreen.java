@@ -417,6 +417,8 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
     private double selectionStartY;
 
     private int replyTargetIndex = -1;
+    /** 最近一次鼠标拖拽/按下位置：用于按住不动时每 tick 继续横向自动滚动选字。 */
+    private double lastInputDragX, lastInputDragY;
     private int copyToastTicks;
 
     private long animStart;
@@ -778,7 +780,7 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
         ColoredTextureRenderer.drawWithAlpha(g, UiTextureManager.rl(UiElement.DIVIDER), SIDEBAR_W - 1, 0, 1, height, alpha);
         // 搜索框/「+」与玩家列表之间的分割线：与右侧标题栏分隔线同一 y=24。
         ColoredTextureRenderer.drawWithAlpha(g, UiTextureManager.rl(UiElement.DIVIDER),
-            2, TITLE_H, SIDEBAR_W - 3, 1, alpha);
+            0, TITLE_H, SIDEBAR_W - 1, 1, alpha);
 
         int y = 2;
         int itemH = SIDEBAR_ITEM_H;
@@ -1452,6 +1454,7 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
 
     @Override
     public void tick() {
+        tickInputDragScroll();
         if (copyToastTicks > 0) copyToastTicks--;
         if (uploadToastTicks > 0) uploadToastTicks--;
         finishPopupClose(settingsCloseStart, () -> { settingsCloseStart = 0; settingsMenu.visible = false; });
@@ -2279,6 +2282,8 @@ TextSpan hit = (mouseY >= msgTop && mouseY <= msgBottom) ? findSelectionSpanAt(m
 
     @Override
     public boolean mouseDragged(MouseButtonEvent click, double dragX, double dragY) {
+        lastInputDragX = click.x();
+        lastInputDragY = click.y();
         if (imageViewer.visible) return imageViewer.mouseDragged(click, width, height);
         // 群聊模态层优先：拖拽只用于模态输入框的拖选，不能变成聊天记录的选区/滚动条拖动
         if (activeGroupModal != null) {
@@ -2336,6 +2341,12 @@ if (quotePressPending
         return super.mouseDragged(click, dragX, dragY);
     }
 
+    /** 按住鼠标停在输入框边缘时，每 tick 继续推进光标（不依赖下一次 mouseDragged 事件）。 */
+    private void tickInputDragScroll() {
+        if (!isDragging() || lastInputDragX == 0 && lastInputDragY == 0) return;
+        handleInputDragScroll(lastInputDragX, lastInputDragY);
+    }
+
     /** 输入框拖选越过左右边界时平滑推进/后退光标（只在输入框纵向范围内生效）。 */
     private boolean handleInputDragScroll(double mouseX, double mouseY) {
         if (!isDragging() || input == null || !input.isFocused()) return false;
@@ -2344,11 +2355,11 @@ if (quotePressPending
         if (mouseY < top || mouseY > bottom) return false;
         int left = input.getX();
         int right = left + input.getWidth();
-        if (mouseX > left + 2 && mouseX < right - 2) return false;
+        if (mouseX > left + 6 && mouseX < right - 8) return false;
         int len = input.getValue().length();
         int cur = input.getCursorPosition();
-        int step = 1 + (int) (Math.abs(mouseX - (mouseX > right ? right : left)) / 4.0);
-        step = Math.min(step, 8);
+        int step = 1 + (int) (Math.abs(mouseX - (mouseX > right - 8 ? right - 8 : left + 6)) / 8.0);
+        step = Math.min(step, 4);
         int target = Mth.clamp(mouseX > right ? cur + step : cur - step, 0, len);
         if (target == cur) return false;
         input.moveCursorTo(target, true);
@@ -3802,7 +3813,9 @@ boolean showAvatar = !(ChatBubbleClientSetup.config().hideRepeatedAvatars() != n
                 if (line != null) usageW = Math.max(usageW, font.width(line) + 8);
             }
         }
-        acc.e33chat$setUsageX(fieldX - INPUT_BOX_OUTSET);
+        usageW = Math.min(panelW, usageW);
+        // 用法提示整栏在聊天面板内居中。
+        acc.e33chat$setUsageX(panelX + (panelW - usageW) / 2);
         acc.e33chat$setUsageWidth(usageW);
         net.minecraft.client.gui.components.CommandSuggestions.SuggestionsList window = acc.getWindow();
         if (window == null) return;
@@ -4719,10 +4732,11 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
         int barY = barTop - REPLY_BAR_H - 4 - notifOffset;
 
         int a255 = (int) (255 * getAnimProgress());
-        int barAlpha = (int) (a255 * 0.72f);
-        RoundRectRenderer.panel(g, barX, barY, barW, barTop - notifOffset - barY, 7f,
-            ChatBubbleTheme.alphaBlend(c().popupBg(), barAlpha),
-            ChatBubbleTheme.alphaBlend(c().divider(), barAlpha));
+        // 半透明底框只画一层：panel() 会先画整块描边再叠内层，两层半透明叠加后
+        // 视觉上接近不透明（用户反馈“实际并没有透明”）。这里只保留一层 55% 填充。
+        int barAlpha = (int) (a255 * 0.55f);
+        RoundRectRenderer.fill(g, barX, barY, barX + barW, barY + REPLY_BAR_H, 7f,
+            ChatBubbleTheme.alphaBlend(c().popupBg(), barAlpha));
 
         String sender = target.senderName().getString();
         if (sender.isEmpty()) sender = Component.translatable("e33chat.sender.system").getString();
@@ -4815,8 +4829,9 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
         // Background fades with the text, at half opacity like the strong-hint bar
         // TOAST_BG 烘焙不透明 toastBg；纹理 × 动画 alpha = 半透明淡入淡出（2.2.4 黑块根因：
         // 当时 blit 的 alpha 通道渲染不透明纯黑，改 drawWithAlpha 后纹理可覆盖 + 透明度可控
-        ColoredTextureRenderer.drawWithAlpha(g, UiTextureManager.rl(UiElement.TOAST_BG),
-            tx - 6, ty - 2, tw + 12, font.lineHeight + 4, (alpha / 2) / 255f);
+        // 已复制/上传提示也走圆角底，与其它 toast 同一套圆角；TOAST_BG 纹理是方角。
+        RoundRectRenderer.fill(g, tx - 6, ty - 2, tx + tw + 6, ty + font.lineHeight + 2, 5f,
+            ChatBubbleTheme.alphaBlend(c().toastBg(), alpha / 2));
         g.drawText(font, text, tx, ty, color, false);
     }
 
