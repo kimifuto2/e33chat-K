@@ -312,6 +312,7 @@
   "e33chat.config.upload_url.desc": "留空用默认图床（uguu.se，约 3 小时过期）。自定义图床需支持 multipart POST：文件字段默认 files[]，额外参数默认空，响应默认 JSON 路径 json:files[0].url（可在配置文件改 uploadField/uploadExtra/uploadResponse）",
   "e33chat.image.full": "一次最多发送 9 张图片",
   "e33chat.upload.start": "上传中…",
+  "e33chat.chat.too_long": "消息过长：最多 %s 个字符",
   "e33chat.upload.failed": "上传失败",
   "e33chat.upload.wait": "图片上传中，稍候再发",
   "e33chat.upload.queue_full": "上传队列已满，请稍后再试",
