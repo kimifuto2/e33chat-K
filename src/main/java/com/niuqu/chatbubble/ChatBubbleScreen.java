@@ -1472,6 +1472,7 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
         tickInputDragScroll();
         if (copyToastTicks > 0) copyToastTicks--;
         if (uploadToastTicks > 0) uploadToastTicks--;
+        finishGroupModalClose();
         finishPopupClose(inputEditorCloseStart, () -> {
             inputEditorCloseStart = 0;
             inputEditorOpen = false;
@@ -2962,7 +2963,14 @@ boolean selDrag = textSelection.isDragActive();
         // 每帧按当前 panelX/panelW 重算，所以卡片永远贴着面板。
         if (activeGroupModal != null) {
             activeGroupModal.ensureLayout();
-            activeGroupModal.render(g, mouseX, mouseY, delta);
+            renderPopupWithAnim(g, groupModalOpenStart, groupModalCloseStart, a -> () -> {
+                GroupUi.setRenderAlpha(a);
+                try {
+                    activeGroupModal.render(g, mouseX, mouseY, delta);
+                } finally {
+                    GroupUi.setRenderAlpha(1f);
+                }
+            });
         }
 
         imageViewer.render(g, font, mouseX, mouseY, width, height, c());
@@ -3159,6 +3167,8 @@ boolean selDrag = textSelection.isDragActive();
 
     /** 当前打开的群聊模态（null = 没有）。同一时刻只有一个：设置页里开"添加玩家"会替换它。 */
     private GroupModal activeGroupModal;
+    /** 群聊模态打开/关闭动画起点（与底部弹层共用 popupAnimStyle）。 */
+    private long groupModalOpenStart, groupModalCloseStart;
 
     @Override
     public net.minecraft.client.gui.Font font() {
@@ -3195,6 +3205,8 @@ boolean selDrag = textSelection.isDragActive();
         if (modal != null) {
             modal.ensureLayout();
             modal.onOpened();
+            groupModalOpenStart = Util.getMillis();
+            groupModalCloseStart = 0;
         }
         ChatMessageStore.debugLog(() -> "[e33chat] group modal opened | "
             + (modal == null ? "null" : modal.getClass().getSimpleName())
@@ -3206,13 +3218,20 @@ boolean selDrag = textSelection.isDragActive();
      *  （被解散/被踢/已退出）时把视图切回公屏。 */
     @Override
     public void closeGroupModal() {
+        if (activeGroupModal == null || groupModalCloseStart > 0) return;
+        groupModalCloseStart = Util.getMillis();
+    }
+
+    /** 关闭动画结束：真正释放模态并恢复聊天输入焦点。 */
+    private void finishGroupModalClose() {
+        if (activeGroupModal == null || groupModalCloseStart == 0) return;
+        if (Util.getMillis() - groupModalCloseStart < UiTokens.POPUP_CLOSE_MS) return;
         GroupModal previous = activeGroupModal;
         activeGroupModal = null;
-        if (previous != null) {
-            previous.onClosed();
-            ChatMessageStore.debugLog("[e33chat] group modal closed | "
-                + previous.getClass().getSimpleName());
-        }
+        groupModalCloseStart = 0;
+        previous.onClosed();
+        ChatMessageStore.debugLog("[e33chat] group modal closed | "
+            + previous.getClass().getSimpleName());
         exitGroupIfGone();
         if (input != null) setFocused(input);
     }

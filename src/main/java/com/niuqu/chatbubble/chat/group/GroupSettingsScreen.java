@@ -377,7 +377,6 @@ public class GroupSettingsScreen extends GroupModal {
             return;
         }
 
-        dimHost(g);
         drawCard(g);
         var c = GroupUi.colors();
 
@@ -398,9 +397,9 @@ public class GroupSettingsScreen extends GroupModal {
         GroupUi.fieldBox(g, fieldX, fieldY, fieldW, FIELD_H);
         if (!editing && nameField.getValue().isEmpty()) {
             g.drawText(tr, Component.translatable("e33chat.group.settings.name_empty").getString(),
-                nameField.getX() + 1, nameField.getY(), c.textMuted(), false);
+                nameField.getX() + 1, nameField.getY(), GroupUi.a(c.textMuted()), false);
         }
-        nameField.extractRenderState(g.raw(), mouseX, mouseY, delta);
+        if (GroupUi.renderAlpha() >= 0.999f) nameField.extractRenderState(g.raw(), mouseX, mouseY, delta);
         hoverEdit = hit(mouseX, mouseY, saveX, fieldY, SAVE_W, FIELD_H);
         GroupUi.button(g, tr, saveX, fieldY, SAVE_W, FIELD_H,
             Component.translatable(editing
@@ -411,9 +410,9 @@ public class GroupSettingsScreen extends GroupModal {
         GroupUi.fieldBox(g, cardX + 8, searchY, searchFieldW, FIELD_H);
         if (searchField.getValue().isEmpty()) {
             g.drawText(tr, Component.translatable("e33chat.group.settings.search_hint").getString(),
-                searchField.getX() + 1, searchField.getY(), c.textMuted(), false);
+                searchField.getX() + 1, searchField.getY(), GroupUi.a(c.textMuted()), false);
         }
-        searchField.extractRenderState(g.raw(), mouseX, mouseY, delta);
+        if (GroupUi.renderAlpha() >= 0.999f) searchField.extractRenderState(g.raw(), mouseX, mouseY, delta);
         hoverSearch = hit(mouseX, mouseY, searchBtnX, searchY, SEARCH_BTN_W, FIELD_H);
         GroupUi.button(g, tr, searchBtnX, searchY, SEARCH_BTN_W, FIELD_H,
             Component.translatable("e33chat.group.search.button"), hoverSearch, false, false, true);
@@ -444,7 +443,7 @@ public class GroupSettingsScreen extends GroupModal {
             int kickW = 40;
             g.drawText(tr,
                 GroupUi.ellipsize(tr, label, cardX + cardW - 12 - kickW - 8 - nameX),
-                nameX, y + (ROW_H - tr.lineHeight) / 2 + 1, c.textPrimary(), false);
+                nameX, y + (ROW_H - tr.lineHeight) / 2 + 1, GroupUi.a(c.textPrimary()), false);
 
             // 踢出：自己 / 创建者不可踢（服务端也会拒绝，这里只是不画按钮）
             if (!isSelf && !isCreator) {
