@@ -122,10 +122,11 @@ public final class ImageMessageComposer {
                     RoundRectRenderer.fill(g, bx + 1, by + 1, bx + bs - 1, by + bs - 1, 3f,
                         ChatBubbleTheme.alphaBlend(c.popupHover(), a255));
                 }
-                int gx = bx + (bs - font.width("✕")) / 2;
-                int gy = by + (bs - font.lineHeight) / 2;
-                g.drawText(font, "✕", gx, gy,
+                g.getMatrices().pushMatrix();
+                g.getMatrices().translate(bx + bs / 2f, by + bs / 2f);
+                g.drawText(font, "✕", -font.width("✕") / 2, -font.lineHeight / 2,
                     ChatBubbleTheme.alphaBlend(c.closeText(), a255), false);
+                g.getMatrices().popMatrix();
             }
         }
         if (!isFull()) {

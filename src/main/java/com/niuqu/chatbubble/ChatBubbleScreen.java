@@ -776,6 +776,9 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
     private void renderSidebar(UiCanvas g, int mouseX, int mouseY, float alpha) {
         ColoredTextureRenderer.drawWithAlpha(g, UiTextureManager.rl(UiElement.SIDEBAR_BG), 0, 0, SIDEBAR_W, height, alpha);
         ColoredTextureRenderer.drawWithAlpha(g, UiTextureManager.rl(UiElement.DIVIDER), SIDEBAR_W - 1, 0, 1, height, alpha);
+        // 搜索框/「+」与玩家列表之间的分割线：与右侧标题栏分隔线同一 y=24。
+        ColoredTextureRenderer.drawWithAlpha(g, UiTextureManager.rl(UiElement.DIVIDER),
+            2, TITLE_H, SIDEBAR_W - 3, 1, alpha);
 
         int y = 2;
         int itemH = SIDEBAR_ITEM_H;
@@ -1840,7 +1843,9 @@ if (this.getFocused() != null && this.getFocused().keyPressed(input))
         double origX = mouseX;
         if (isPanelSliding()) mouseX -= currentPanelOffset();
 
-        if (button == 0 && imageComposer.isInsideStrip(mouseX, mouseY, panelX, panelW, barTop)) {
+        if (button == 0 && !settingsMenu.visible && !emojiPanel.visible && !quickChatPanel.visible
+                && !searchPanel.visible && !actionMenu.visible && !actionCustom.visible
+                && imageComposer.isInsideStrip(mouseX, mouseY, panelX, panelW, barTop)) {
             int hit = imageComposer.handleClick(mouseX, mouseY, panelX, panelW, barTop);
             if (hit >= 0) imageComposer.remove(hit);
             else if (hit == ImageMessageComposer.CLICK_ADD) openImagePicker();
@@ -2339,7 +2344,7 @@ if (quotePressPending
         if (mouseY < top || mouseY > bottom) return false;
         int left = input.getX();
         int right = left + input.getWidth();
-        if (mouseX >= left && mouseX <= right) return false;
+        if (mouseX > left + 2 && mouseX < right - 2) return false;
         int len = input.getValue().length();
         int cur = input.getCursorPosition();
         int step = 1 + (int) (Math.abs(mouseX - (mouseX > right ? right : left)) / 4.0);
@@ -3630,6 +3635,19 @@ boolean showAvatar = !(ChatBubbleClientSetup.config().hideRepeatedAvatars() != n
         g.drawText(font, text, tx, y + 3, c().timeColor(), false);
     }
 
+    /** 计算一行文字去掉尾部空白后的宽度：图片消息的 CICode 被剥掉后会留下每张图一个空格，
+     *  若按原始行宽算气泡，带 N 张图就会多出 N 个空格的空白（用户反馈的“文字后面一段空白”）。 */
+    private int textWidthNoTrailingSpace(net.minecraft.util.FormattedCharSequence line) {
+        StringBuilder sb = new StringBuilder();
+        line.accept((index, style, codePoint) -> {
+            sb.appendCodePoint(codePoint);
+            return true;
+        });
+        int end = sb.length();
+        while (end > 0 && Character.isWhitespace(sb.charAt(end - 1))) end--;
+        return font.width(sb.substring(0, end));
+    }
+
     private List<FormattedCharSequence> wrapContent(Component c, int width) {
         List<Component> paras = new ArrayList<>();
         MutableComponent[] cur = { Component.empty() };
@@ -3790,9 +3808,8 @@ boolean showAvatar = !(ChatBubbleClientSetup.config().hideRepeatedAvatars() != n
         if (window == null) return;
         net.minecraft.client.renderer.Rect2i area = ((com.niuqu.chatbubble.mixin.SuggestionWindowAccessor) window).getArea();
         if (area == null) return;
-        int bottom = suggestionWindowBottom();
-        if (usageLines != null && !usageLines.isEmpty()) bottom -= 12;
-        int newY = bottom - area.getHeight();
+        // 候选框始终贴输入框视觉上沿 1px；提示行不能把候选框再抬高 12px。
+        int newY = suggestionWindowBottom() - area.getHeight();
         if (area.getX() != fieldX) area.setX(fieldX);
         if (area.getY() != newY) area.setY(newY);
     }
@@ -4116,7 +4133,7 @@ boolean showAvatar = !(ChatBubbleClientSetup.config().hideRepeatedAvatars() != n
         if (showAvatar) drawPlayerHead(g, skin, avatarX, baseY, Appearance.avatarSize(), Appearance.avatarSize() + 2, alpha);
 
         int maxTextW = 0;
-        for (var line : lines) maxTextW = Math.max(maxTextW, font.width(line));
+        for (var line : lines) maxTextW = Math.max(maxTextW, textWidthNoTrailingSpace(line));
         int textX = own ? (avatarX - UiTokens.AVATAR_NAME_GAP - maxTextW) : (avatarX + Appearance.avatarSize() + UiTokens.AVATAR_GAP);
 
         int y = baseY + NAME_H;
@@ -4704,12 +4721,13 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
         int sendX = panelX + panelW - PAD - ICON_S + 2;
         int barX = gearX + ICON_S + 4;
         int barW = sendX - 6 - barX;
-        int barY = barTop - REPLY_BAR_H - notifOffset;
+        int barY = barTop - REPLY_BAR_H - 4 - notifOffset;
 
         int a255 = (int) (255 * getAnimProgress());
+        int barAlpha = (int) (a255 * 0.72f);
         RoundRectRenderer.panel(g, barX, barY, barW, barTop - notifOffset - barY, 7f,
-            ChatBubbleTheme.alphaBlend(c().popupBg(), a255),
-            ChatBubbleTheme.alphaBlend(c().divider(), a255));
+            ChatBubbleTheme.alphaBlend(c().popupBg(), barAlpha),
+            ChatBubbleTheme.alphaBlend(c().divider(), barAlpha));
 
         String sender = target.senderName().getString();
         if (sender.isEmpty()) sender = Component.translatable("e33chat.sender.system").getString();
@@ -4730,8 +4748,11 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
             RoundRectRenderer.fill(g, cx + 1, cy + 1, cx + 11, cy + 11, 4f,
                 ChatBubbleTheme.alphaBlend(c().popupHover(), a255));
         }
-        g.drawText(font, "✕", cx + (12 - font.width("✕")) / 2,
-            cy + (12 - font.lineHeight) / 2, c().closeText(), false);
+        g.getMatrices().pushMatrix();
+        g.getMatrices().translate(cx + 6f, cy + 6f);
+        g.drawText(font, "✕", -font.width("✕") / 2,
+            -font.lineHeight / 2, c().closeText(), false);
+        g.getMatrices().popMatrix();
     }
 
     private boolean isMouseOverReplyCancel(double mx, double my) {
@@ -4741,7 +4762,7 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
         int sendX = panelX + panelW - PAD - ICON_S + 2;
         int barX = gearX + ICON_S + 4;
         int barW = sendX - 6 - barX;
-        int barY = barTop - REPLY_BAR_H - notifOffset;
+        int barY = barTop - REPLY_BAR_H - 4 - notifOffset;
         int cx = barX + barW - 16;
         int cy = barY + 3;
         return mx >= cx && mx <= cx + 12 && my >= cy && my <= cy + 12;
