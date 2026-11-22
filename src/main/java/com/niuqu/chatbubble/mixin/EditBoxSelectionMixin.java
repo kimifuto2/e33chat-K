@@ -61,9 +61,10 @@ public class EditBoxSelectionMixin {
     }
 
     /**
-     * 补全预览后缀：原版和正文共用 EditBox.textColor（主题主色）→ 和正文同色，看不出是“预览”。
+     * 补全预览后缀：原版和正文共用 EditBox.textColor。这里强制预览也使用主题主文字色，
+     * 避免用户把光标移到中间后，右侧预览被误看成“正文变成灰色”。
      * 第二次 text(Font, FormattedCharSequence, IIIZ) 就是 EditBox 画 suggestion 的那次
-     * （第一次是正文，javap 顺序：251 正文 / 406 预览），只把它改成主题次要文字色。
+     * （第一次是正文，javap 顺序：251 正文 / 406 预览）。
      */
     @Redirect(method = "extractWidgetRenderState",
         at = @At(value = "INVOKE",
@@ -73,7 +74,7 @@ public class EditBoxSelectionMixin {
                                           int x, int y, int color, boolean shadow) {
         int drawColor = color;
         if (net.minecraft.client.Minecraft.getInstance().gui.screen() instanceof ChatBubbleScreen) {
-            drawColor = 0xFF000000 | (Appearance.snapshot().textMuted() & 0xFFFFFF);
+            drawColor = 0xFF000000 | (Appearance.snapshot().textPrimary() & 0xFFFFFF);
         }
         g.text(font, text, x, y, drawColor, shadow);
     }
