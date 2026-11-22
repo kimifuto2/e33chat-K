@@ -425,6 +425,11 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
     private double selectionStartY;
 
     private int replyTargetIndex = -1;
+    /** 输入框上方「全文编辑」面板：点击 ^ 展开，编辑仍由 chatField 承担，两边文本天然同步。 */
+    private boolean inputEditorOpen;
+    private long inputEditorStart, inputEditorCloseStart;
+    private int inputEditorScroll;
+    private boolean inputEditorDragging;
     /** 最近一次鼠标拖拽/按下位置：用于按住不动时每 tick 继续横向自动滚动选字。 */
     private double lastInputDragX, lastInputDragY;
     /** 只有真正发生过 mouseDragged 才允许 tick 自动滚选；单击也会 setDragging(true)。 */
@@ -603,10 +608,13 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
      *  于是总视觉宽度不变、光标永远停在底板内侧。
      */
     private static final int INPUT_CURSOR_RESERVE = 6;
+    /** 输入框右侧给「展开编辑」箭头预留的宽度；箭头只画 ^，不要竖杆。 */
+    private static final int INPUT_EDITOR_RESERVE = 14;
+    private static final int INPUT_EDITOR_MAX_H = 160;
 
     /** 输入框宽度的唯一算法（窄窗口下不能算出 0/负值，见 {@link #MIN_INPUT_W}）。 */
     private int inputFieldWidth(int inputX, int sendX) {
-        return Math.max(MIN_INPUT_W, sendX - ICON_S * 2 - 12 - inputX - INPUT_CURSOR_RESERVE);
+        return Math.max(MIN_INPUT_W, sendX - ICON_S * 2 - 12 - inputX - INPUT_CURSOR_RESERVE - INPUT_EDITOR_RESERVE);
     }
 
     /** 底栏输入框**本体**的左边界（不含已选动作前缀）；绘制与布局都从这里取值。 */
@@ -1476,6 +1484,10 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
         tickInputDragScroll();
         if (copyToastTicks > 0) copyToastTicks--;
         if (uploadToastTicks > 0) uploadToastTicks--;
+        finishPopupClose(inputEditorCloseStart, () -> {
+            inputEditorCloseStart = 0;
+            inputEditorOpen = false;
+        });
         finishPopupClose(settingsCloseStart, () -> { settingsCloseStart = 0; settingsMenu.visible = false; });
         finishPopupClose(emojiCloseStart, () -> { emojiCloseStart = 0; emojiPanel.visible = false; });
         finishPopupClose(quickCloseStart, () -> {
@@ -1796,6 +1808,16 @@ if (this.getFocused() != null && this.getFocused().keyPressed(input))
             mentionNavigated = true;
             return true;
         }
+        if (inputEditorOpen) {
+            int[] er = inputEditorRect();
+            if (mouseX >= er[0] && mouseX <= er[0] + er[2] && mouseY >= er[1] && mouseY <= er[1] + er[3]) {
+                List<InputEditorLine> ls = buildInputEditorLines(chatField.getText(), er[2] - 14);
+                int visible = Math.max(1, (er[3] - 10) / (textRenderer.fontHeight + 1));
+                int maxScroll = Math.max(0, ls.size() - visible);
+                inputEditorScroll = MathHelper.clamp(inputEditorScroll - (int) scrollY, 0, maxScroll);
+                return true;
+            }
+        }
         int sidebarX = getSidebarScreenX();
         if ((sidebarOpen || sidebarAnimating) && mouseX >= sidebarX && mouseX <= sidebarX + SIDEBAR_W) {
             // 先用真实的当前行数刷新上限，避免拿上一帧的旧上限滚出越界偏移。
@@ -1862,6 +1884,12 @@ if (this.getFocused() != null && this.getFocused().keyPressed(input))
         // the original coordinate.
         double origX = mouseX;
         if (isPanelSliding()) mouseX -= currentPanelOffset();
+
+        if (button == 0 && isMouseOverInputEditorArrow(mouseX, mouseY)) {
+            toggleInputEditor();
+            return true;
+        }
+        if (button == 0 && inputEditorOpen && handleInputEditorClick(mouseX, mouseY)) return true;
 
         if (button == 0 && !settingsMenu.visible && !emojiPanel.visible && !quickChatPanel.visible
                 && !searchPanel.visible && !actionMenu.visible && !actionCustom.visible
@@ -2316,6 +2344,12 @@ if (quotePressPending
         // 输入框横向拖选：鼠标超出输入框左右边界时，原版 TextFieldWidget 只把光标夹在
         // 可见首/尾，既不会自动横向滚动，反向拖回还会直接跳回第一个字符。这里在边界外
         // 按超出的距离推进光标（selecting=true），让被隐藏的文字能被连续选中。
+        if (inputEditorOpen && inputEditorDragging && isDragging()) {
+            int[] er = inputEditorRect();
+            List<InputEditorLine> ls = buildInputEditorLines(chatField.getText(), er[2] - 14);
+            chatField.setCursor(inputEditorCursorAt(click.x(), click.y(), ls), true);
+            return true;
+        }
         if (handleInputDragScroll(click.x(), click.y())) return true;
         // Selection drag first (a press either started a selection or the scrollbar
         // drag, never both  ?the scrollbar hit-test in mouseClicked returns earlier).
@@ -2389,6 +2423,7 @@ if (quotePressPending
     @Override
     public boolean mouseReleased(Click click) {
         inputDragMoved = false;
+        inputEditorDragging = false;
         if (imageViewer.visible) return imageViewer.mouseReleased();
         // 群聊模态层优先：释放只用于模态输入框结束拖选
         if (activeGroupModal != null) {
@@ -2453,6 +2488,11 @@ boolean selDrag = textSelection.isDragActive();
         int sendX = panelX + panelW - PAD - ICON_S + 2;
         int emojiX = sendX - ICON_S - 4;
         int imageX = emojiX - ICON_S - 4;
+        if (mx >= imageX - INPUT_EDITOR_RESERVE - 1 && mx <= imageX - INPUT_EDITOR_RESERVE + 11
+                && my >= iconY && my <= iconY + ICON_S) {
+            toggleInputEditor();
+            return true;
+        }
         if (mx >= imageX && mx <= imageX + ICON_S && my >= iconY && my <= iconY + ICON_S) {
             if (settingsMenu.visible) beginPopupClose(s -> settingsCloseStart = s, () -> settingsMenu.visible = false);
             if (emojiPanel.visible) beginPopupClose(s -> emojiCloseStart = s, () -> emojiPanel.visible = false);
@@ -2862,6 +2902,7 @@ boolean selDrag = textSelection.isDragActive();
         renderToast(g);
         renderBottomBar(g, mouseX, mouseY, getBarAlpha());
         imageComposer.render(g, mouseX, mouseY, textRenderer, c(), panelX, panelW, barTop, getBarAlpha());
+        renderInputEditor(g, mouseX, mouseY);
         renderMentionPopup(g, mouseX, mouseY);
         // 弹层面板（设 ?表情/快捷/搜索）画在底栏之上，z 高一层——侧边栏 ?z 后画
         // 会盖住它们，提升弹层 z 到侧边栏之上避免遮挡
@@ -4926,6 +4967,159 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
         setFocused(chatField);
     }
 
+    // ===== 输入框「展开全文」编辑面板 =========================================
+    // 原版 TextFieldWidget 只有单行，长消息/多图代码在输入框里只能看到一小段。这里不另造
+    // 编辑器控件：面板只负责把 chatField 的全文按宽度折行显示并提供光标定位，键盘输入仍
+    // 交给原版 chatField（它始终是 focused），因此两边文本天然双向同步、撤销/选区/粘贴
+    // Ctrl+A 等按键行为完全沿用原版。
+
+    private static final class InputEditorLine {
+        final String text;
+        final int start;
+        InputEditorLine(String text, int start) { this.text = text; this.start = start; }
+    }
+
+    private int[] inputEditorRect() {
+        int h = Math.min(INPUT_EDITOR_MAX_H, Math.max(48, msgBottom - msgTop - 8));
+        int x = panelX + 4;
+        int w = panelW - 8;
+        int y = barTop - 4 - h;
+        return new int[]{x, y, w, h};
+    }
+
+    private List<InputEditorLine> buildInputEditorLines(String text, int maxW) {
+        List<InputEditorLine> out = new java.util.ArrayList<>();
+        StringBuilder cur = new StringBuilder();
+        int start = 0;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == '\n') {
+                out.add(new InputEditorLine(cur.toString(), start));
+                cur.setLength(0);
+                start = i + 1;
+                continue;
+            }
+            String trial = cur.toString() + c;
+            if (!cur.isEmpty() && textRenderer.getWidth(trial) > maxW) {
+                out.add(new InputEditorLine(cur.toString(), start));
+                cur.setLength(0);
+                start = i;
+            }
+            cur.append(c);
+        }
+        out.add(new InputEditorLine(cur.toString(), start));
+        return out;
+    }
+
+    private int inputEditorCursorAt(double mx, double my, List<InputEditorLine> lines) {
+        int[] r = inputEditorRect();
+        int lineH = textRenderer.fontHeight + 1;
+        int contentX = r[0] + 6;
+        int firstY = r[1] + 5;
+        int line = MathHelper.clamp((int) ((my - firstY) / lineH) + inputEditorScroll, 0, lines.size() - 1);
+        InputEditorLine l = lines.get(line);
+        int rel = MathHelper.clamp((int) (mx - contentX), 0, Math.max(0, textRenderer.getWidth(l.text)));
+        int best = 0;
+        for (int i = 0; i <= l.text.length(); i++) {
+            int w = textRenderer.getWidth(l.text.substring(0, i));
+            if (w >= rel) { best = i; break; }
+            best = i;
+        }
+        return MathHelper.clamp(l.start + best, 0, chatField.getText().length());
+    }
+
+    private void toggleInputEditor() {
+        if (inputEditorOpen) { closeInputEditor(); return; }
+        inputEditorOpen = true;
+        inputEditorStart = Util.getMeasuringTimeMs();
+        inputEditorCloseStart = 0;
+        inputEditorScroll = 0;
+        setFocused(chatField);
+    }
+
+    private void closeInputEditor() {
+        if (!inputEditorOpen || inputEditorCloseStart > 0) return;
+        beginPopupClose(s -> inputEditorCloseStart = s, () -> inputEditorOpen = false);
+    }
+
+    private boolean isMouseOverInputEditorArrow(double mx, double my) {
+        int sendX = panelX + panelW - PAD - ICON_S + 2;
+        int emojiX = sendX - ICON_S - 4;
+        int imageX = emojiX - ICON_S - 4;
+        int ax = imageX - INPUT_EDITOR_RESERVE;
+        int iconY = barTop + (BAR_H - ICON_S) / 2;
+        return mx >= ax - 1 && mx <= ax + 11 && my >= iconY && my <= iconY + ICON_S;
+    }
+
+    private void renderInputEditor(DrawContext g, int mouseX, int mouseY) {
+        if (!inputEditorOpen) return;
+        renderPopupWithAnim(g, inputEditorStart, inputEditorCloseStart,
+            a -> () -> drawInputEditor(g, mouseX, mouseY, a));
+    }
+
+    private void drawInputEditor(DrawContext g, int mouseX, int mouseY, float alpha) {
+        int[] r = inputEditorRect();
+        int a255 = (int) (255 * alpha);
+        RoundRectRenderer.panel(g, r[0], r[1], r[2], r[3], 8f,
+            ChatBubbleTheme.alphaBlend(c().popupBg(), (int) (238 * alpha)),
+            ChatBubbleTheme.alphaBlend(c().divider(), a255));
+        String text = chatField.getText();
+        List<InputEditorLine> lines = buildInputEditorLines(text, r[2] - 14);
+        int lineH = textRenderer.fontHeight + 1;
+        int contentX = r[0] + 6;
+        int firstY = r[1] + 5;
+        int visible = Math.max(1, (r[3] - 10) / lineH);
+        int maxScroll = Math.max(0, lines.size() - visible);
+        inputEditorScroll = MathHelper.clamp(inputEditorScroll, 0, maxScroll);
+        int txtColor = ChatBubbleTheme.alphaBlend(c().textPrimary(), a255);
+        for (int i = 0; i < visible && i + inputEditorScroll < lines.size(); i++) {
+            InputEditorLine l = lines.get(i + inputEditorScroll);
+            g.drawText(textRenderer, l.text, contentX, firstY + i * lineH, txtColor, false);
+        }
+        // 光标：映射到折行后的行/列，面板内也可见编辑位置。
+        int cursor = MathHelper.clamp(chatField.getCursor(), 0, text.length());
+        int caretLine = lines.size() - 1;
+        int caretCol = 0;
+        for (int i = 0; i < lines.size(); i++) {
+            InputEditorLine l = lines.get(i);
+            if (cursor >= l.start && cursor <= l.start + l.text.length()) {
+                caretLine = i; caretCol = cursor - l.start; break;
+            }
+        }
+        int cy = firstY + (caretLine - inputEditorScroll) * lineH;
+        if (cy >= firstY - 1 && cy <= r[1] + r[3]) {
+            InputEditorLine l = lines.get(caretLine);
+            int cx = contentX + textRenderer.getWidth(l.text.substring(0, Math.min(caretCol, l.text.length())));
+            g.fill(cx, cy, cx + 1, cy + textRenderer.fontHeight,
+                ChatBubbleTheme.alphaBlend(c().nameColor(), a255));
+        }
+        if (maxScroll > 0) {
+            int trackX = r[0] + r[2] - 4;
+            int trackTop = r[1] + 4;
+            int trackH = r[3] - 8;
+            g.fill(trackX, trackTop, trackX + 2, trackTop + trackH,
+                ChatBubbleTheme.alphaBlend(c().divider(), a255));
+            int thumbH = Math.max(8, trackH * visible / Math.max(1, lines.size()));
+            int thumbY = trackTop + (maxScroll == 0 ? 0 : (trackH - thumbH) * inputEditorScroll / maxScroll);
+            g.fill(trackX, thumbY, trackX + 2, thumbY + thumbH,
+                ChatBubbleTheme.alphaBlend(c().quoteBar(), a255));
+        }
+    }
+
+    /** 返回 true 表示这次点击已被编辑面板吞掉；点击面板外只关闭面板，让原点击继续。 */
+    private boolean handleInputEditorClick(double mx, double my) {
+        if (!inputEditorOpen) return false;
+        int[] r = inputEditorRect();
+        boolean inside = mx >= r[0] && mx <= r[0] + r[2] && my >= r[1] && my <= r[1] + r[3];
+        if (!inside) { closeInputEditor(); return false; }
+        List<InputEditorLine> lines = buildInputEditorLines(chatField.getText(), r[2] - 14);
+        chatField.setCursor(inputEditorCursorAt(mx, my, lines), false);
+        setFocused(chatField);
+        setDragging(true);
+        inputEditorDragging = true;
+        return true;
+    }
+
     private void renderBottomBar(DrawContext g, int mouseX, int mouseY, float panelAlpha) {
         int a255 = (int) (255 * panelAlpha);
         int barBg = ChatBubbleTheme.alphaBlend(c().barBg(), a255);
@@ -4975,6 +5169,18 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
         boolean hoverSend = mouseX >= sendX && mouseX <= sendX + ICON_S
             && mouseY >= iconY && mouseY <= iconY + ICON_S;
         drawIconButton(g, iconTex("send"), sendX, iconY, ICON_S - 1, getAnimProgress(), hoverSend);
+
+        // 输入框与图片按钮之间的「展开全文」箭头：只画 ^（无竖杆），不占图标按钮的方框。
+        int editorArrowX = imageX - INPUT_EDITOR_RESERVE;
+        boolean hoverEditorArrow = mouseX >= editorArrowX - 1 && mouseX <= editorArrowX + 11
+            && mouseY >= iconY && mouseY <= iconY + ICON_S;
+        int arrowColor = ChatBubbleTheme.alphaBlend(
+            hoverEditorArrow ? c().nameColor() : c().textMuted(), a255);
+        g.getMatrices().pushMatrix();
+        g.getMatrices().translate(editorArrowX + 5f, iconY + ICON_S / 2f);
+        g.drawText(textRenderer, "^", -textRenderer.getWidth("^") / 2,
+            -textRenderer.fontHeight / 2, arrowColor, false);
+        g.getMatrices().popMatrix();
     }
 
     /** Each bottom-bar icon sits in its own rounded button with a thin border ring ( ? style). */
