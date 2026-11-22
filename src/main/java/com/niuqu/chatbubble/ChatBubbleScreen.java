@@ -417,7 +417,7 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
     private double selectionStartY;
 
     private int replyTargetIndex = -1;
-    /** 输入框上方「全文编辑」面板：编辑仍由原版 input 承担，两边文本天然同步。 */
+    /** 输入框上方「全文编辑」面板：打开时复制原文本到独立 buffer，原输入框保持不动。 */
     private boolean inputEditorOpen;
     private long inputEditorStart, inputEditorCloseStart;
     private int inputEditorScroll;
