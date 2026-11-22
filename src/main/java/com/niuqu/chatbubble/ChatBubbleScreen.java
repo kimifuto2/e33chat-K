@@ -598,7 +598,7 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
     /** 输入框右侧给「展开编辑」箭头预留的宽度；箭头只画 ^，不要竖杆。 */
     private static final int INPUT_EDITOR_RESERVE = 10;
     /** 输入框右上角圆形展开按钮直径（同时是输入框文字区右侧预留量）。 */
-    private static final int INPUT_EDITOR_BTN_S = 9;
+    private static final int INPUT_EDITOR_BTN_S = 6;
     private static final int INPUT_EDITOR_MAX_H = 160;
 
     /** 输入框宽度的唯一算法（窄窗口下不能算出 0/负值，见 {@link #MIN_INPUT_W}）。 */
@@ -5045,13 +5045,17 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
         input.moveCursorToEnd(false);
     }
 
-    /** 输入框右上角的圆形展开按钮：圆心在输入框右边缘、垂直居中。 */
+    /** 输入框右上角圆形展开按钮：圆心正好在右上圆角的圆心（视觉框 right-4, top+4）。 */
     private int[] inputEditorButtonRect() {
         int ibX = inputBaseX();
         int ibW = input.getWidth() + INPUT_CURSOR_RESERVE + INPUT_EDITOR_RESERVE;
         int ibY = inputBarY();
         int d = INPUT_EDITOR_BTN_S;
-        return new int[]{ibX + ibW - d, ibY + (inputBarH() - d) / 2, d, d};
+        // 输入框视觉矩形 = ibX-2 .. ibX+ibW+2、ibY-2 .. ibY+ibH+2，圆角半径 6；
+        // 右上圆角圆心 = (视觉右 - 6, 视觉上 + 6) = (ibX+ibW-4, ibY+4)。
+        int cx = ibX + ibW - 4;
+        int cy = ibY + 4;
+        return new int[]{cx - d / 2, cy - d / 2, d, d};
     }
 
     private boolean isMouseOverInputEditorArrow(double mx, double my) {
@@ -5326,14 +5330,14 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
         int arrowBorder = ChatBubbleTheme.alphaBlend(
             hoverEditorArrow ? c().nameColor() : c().textMuted(), a255);
         int arrowBg = ChatBubbleTheme.alphaBlend(c().inputBg(), a255);
-        RoundRectRenderer.fill(g, ar[0] - 1, ar[1] - 1, ar[0] + ar[2] + 1, ar[1] + ar[3] + 1,
-            5.5f, arrowBorder);
-        RoundRectRenderer.fill(g, ar[0], ar[1], ar[0] + ar[2], ar[1] + ar[3], 4.5f, arrowBg);
+        RoundRectRenderer.fill(g, ar[0], ar[1], ar[0] + ar[2], ar[1] + ar[3], 3f, arrowBorder);
+        RoundRectRenderer.fill(g, ar[0] + 1, ar[1] + 1, ar[0] + ar[2] - 1, ar[1] + ar[3] - 1,
+            2f, arrowBg);
         int arrowColor = ChatBubbleTheme.alphaBlend(
             hoverEditorArrow ? c().nameColor() : c().textMuted(), a255);
         g.getMatrices().pushMatrix();
         g.getMatrices().translate(ar[0] + ar[2] / 2f, ar[1] + ar[3] / 2f);
-        g.getMatrices().scale(0.8f, 0.8f);
+        g.getMatrices().scale(0.5f, 0.5f);
         g.drawText(font, "^", -font.width("^") / 2, -font.lineHeight / 2, arrowColor, false);
         g.getMatrices().popMatrix();
     }
