@@ -292,7 +292,7 @@ searchField.setTextShadow(false);
 
     /** 关闭本模态：邀请模式回到群聊设置，建群模式直接回聊天面板。 */
     private void close() {
-        onClosed();
+        // onClosed 由 Host 在替换/关闭动画结束时统一调用，避免重复收尾。
         if (returnTo != null) host.openGroupModal(returnTo);
         else host.closeGroupModal();
     }

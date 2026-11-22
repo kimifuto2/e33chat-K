@@ -5220,6 +5220,7 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
                 return true;
             }
             if (key == 86) {
+                if (pasteImageCodesFromClipboard()) return true;
                 inputEditorInsert(client.keyboard.getClipboard());
                 return true;
             }
