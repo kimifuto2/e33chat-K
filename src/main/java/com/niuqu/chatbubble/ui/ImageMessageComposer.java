@@ -110,11 +110,21 @@ public final class ImageMessageComposer {
                     ChatBubbleTheme.alphaBlend(c.textMuted(), a255), false);
             }
             if (hover) {
-                // 右上角删除键：与表情面板一致的小 ✕
-                int bx = ex + ts - 9, by = ty;
-                RoundRectRenderer.fill(g, bx, by, bx + 9, by + 9, 3f,
+                // 右上角删除键：与其它图标按钮同构的 1px 主题描边 + 内层圆角底，
+                // 字形按 font.getWidth/fontHeight 真居中（不能用固定 +4 偏移）。
+                int bs = 10;
+                int bx = ex + ts - bs, by = ty;
+                RoundRectRenderer.fill(g, bx, by, bx + bs, by + bs, 4f,
+                    ChatBubbleTheme.alphaBlend(c.textMuted(), a255));
+                RoundRectRenderer.fill(g, bx + 1, by + 1, bx + bs - 1, by + bs - 1, 3f,
                     ChatBubbleTheme.alphaBlend(c.inputBg(), a255));
-                g.drawText(font, "✕", bx + 4 - font.getWidth("✕") / 2, by + 1,
+                if (hover && mouseX >= bx && mouseX <= bx + bs && mouseY >= by && mouseY <= by + bs) {
+                    RoundRectRenderer.fill(g, bx + 1, by + 1, bx + bs - 1, by + bs - 1, 3f,
+                        ChatBubbleTheme.alphaBlend(c.popupHover(), a255));
+                }
+                int gx = bx + (bs - font.getWidth("✕")) / 2;
+                int gy = by + (bs - font.fontHeight) / 2;
+                g.drawText(font, "✕", gx, gy,
                     ChatBubbleTheme.alphaBlend(c.closeText(), a255), false);
             }
         }

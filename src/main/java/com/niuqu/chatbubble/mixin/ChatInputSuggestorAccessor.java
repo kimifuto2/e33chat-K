@@ -15,4 +15,8 @@ public interface ChatInputSuggestorAccessor {
 
     @Accessor("width")
     void e33chat$setSuggestWidth(int width);
+
+    /** 当前用法/报错提示行（原版 renderMessages 画的那几行）；空 = 没有提示行。 */
+    @Accessor("messages")
+    java.util.List<net.minecraft.text.OrderedText> getMessages();
 }
