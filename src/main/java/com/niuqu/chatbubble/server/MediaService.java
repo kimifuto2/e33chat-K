@@ -18,7 +18,7 @@ public final class MediaService {
 
     /** Client requests a download: rate-limit check, existence check, chunked reply. */
     public static void handleRequest(ServerPlayerEntity sender, DiskMediaStore store, String mediaId) {
-        if (!store.allowTransfer(sender.getName().getString())) {
+        if (!store.allowFetch(sender.getName().getString())) {
             sendNotFound(sender, mediaId);
             return;
         }
@@ -53,7 +53,7 @@ public final class MediaService {
         }
         String result;
         if (index == 0) {
-            if (!store.allowTransfer(sender.getName().getString())) {
+            if (!store.allowUpload(sender.getName().getString())) {
                 ServerPlayNetworking.send(sender, new MediaUploadAckPayload(uploadId, null, "rate limited"));
                 return;
             }

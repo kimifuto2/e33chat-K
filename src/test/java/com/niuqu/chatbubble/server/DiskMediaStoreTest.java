@@ -165,4 +165,19 @@ class DiskMediaStoreTest {
         store.cleanupExpiredThrottled();
         assertEquals(10, store.sizeOf(second));
     }
+
+    @Test
+    void separateRateBudgetsAllowNineImageUploadsAndFetches() {
+        DiskMediaStore store = new DiskMediaStore(Path.of("nonexistent"),
+            DiskMediaStore.MAX_SINGLE_BYTES, DiskMediaStore.QUOTA_BYTES, 0);
+        // 9 图一条消息 = 9 次上传 + 9 次下载；上传与下载预算必须互不占用。
+        for (int i = 0; i < 9; i++) {
+            assertTrue(store.allowUpload("alice"), "upload " + i + " should pass");
+            assertTrue(store.allowFetch("alice"), "fetch " + i + " should pass");
+        }
+        assertTrue(store.allowFetch("alice"), "fetch retry should still fit the 32/10s fetch budget");
+        for (int i = 0; i < 16; i++) assertTrue(store.allowUpload("bob"), "upload " + i + " should pass");
+        assertFalse(store.allowUpload("bob"), "17th upload in 10s must be throttled");
+    }
+
 }

@@ -1,7 +1,7 @@
 # E33Chat · Minecraft 1.21.11 Fabric 版
 
 > **本分支：`main` · Minecraft 1.21.11（稳定线）**
-> 产物：**`e33chat-Fabric-1.21.11-3.2.1.jar`**（739,049 字节 / ≈722 KiB） · 模组版本 **3.2.1**
+> 产物：**`e33chat-Fabric-1.21.11-3.2.1.jar`**（739,231 字节 / ≈722 KiB） · 模组版本 **3.2.1**
 > 仓库：[kimifuto2/e33chat-K](https://github.com/kimifuto2/e33chat-K) · 上游：[E33EPUS/E33Chat](https://github.com/E33EPUS/E33Chat)（MIT）
 >
 > 基于上游的 **1.21.11 Fabric 移植**，并在其上做了大量功能增强与缺陷修复：在保留原作者聊天界面风格的基础上，补齐了上游没有的交互与通知能力。
@@ -14,9 +14,9 @@
 
 | 分支 | Minecraft | 定位 | 产物 jar（各分支最新） | 大小 |
 |---|---|---|---|---|
-| **`main`**（本分支） | 1.21.11 | 稳定线 | `e33chat-Fabric-1.21.11-3.2.1.jar` | 739,049 B |
-| `mc26.3` | 26.3 | 26.x 移植线 | `e33chat-Fabric-26.3-3.2.1.jar` | 742,597 B |
-| `mc26.2` | 26.2 | 26.x 移植线 | `e33chat-Fabric-26.2-3.2.1.jar` | 742,621 B |
+| **`main`**（本分支） | 1.21.11 | 稳定线 | `e33chat-Fabric-1.21.11-3.2.1.jar` | 739,231 B |
+| `mc26.3` | 26.3 | 26.x 移植线 | `e33chat-Fabric-26.3-3.2.1.jar` | 742,767 B |
+| `mc26.2` | 26.2 | 26.x 移植线 | `e33chat-Fabric-26.2-3.2.1.jar` | 742,791 B |
 
 > 三个分支都在 **<https://github.com/kimifuto2/e33chat-K>** 下。`mc26.3` / `mc26.2` 是 **26.x 移植线**（Mojang 年份版本号），构建链与 1.21.11 差异很大（Java 25 / Gradle 9.8+ / Loom 1.19.3 / 不再混淆），详见对应分支 README 的「26.x 移植说明」；**本分支（`main`）只针对 1.21.11**。
 
@@ -87,6 +87,7 @@
 - **P3（Paper 插件）**：Paper 端注册同一线协议并转发给范围内的在线玩家；客户端无需任何改动，图片上传仍走服务端媒体或第三方图床。
 - **回退**：连接旧版 Fabric 服务端、没有该协议的 Paper 服务端，或发送载荷失败时，自动退回原有的文本分条发送。
 - 服务端只中继消息内容，不保存图片二进制；图片加载仍由现有 `ImageLoader` 处理。
+- **服务端媒体限流**：上传与下载分别计数（16 / 32 次每 10 秒），9 图一条消息不会因上传占满下载预算而失败。
 
 ### 图片消息与全屏查看器（3.2.1）
 
@@ -269,8 +270,8 @@ java.lang.IllegalStateException: Cannot register channel. Too many channel regis
 
 | 文件 | 大小 |
 |---|---|
-| `build/libs/e33chat-Fabric-1.21.11-3.2.1.jar` | 739,049 B |
-| `build/libs/e33chat-Fabric-1.21.11-3.2.1-sources.jar` | 512,633 B |
+| `build/libs/e33chat-Fabric-1.21.11-3.2.1.jar` | 739,231 B |
+| `build/libs/e33chat-Fabric-1.21.11-3.2.1-sources.jar` | 513,038 B |
 
 ---
 
