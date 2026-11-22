@@ -164,7 +164,7 @@ public class ChatBubbleClientSetup implements ClientModInitializer {
      * 配置阶段的通道生命周期：INIT 与 START 共用（幂等）。先无条件注销上一次连接的残留，
      * 再为本连接注册 E33Chat 的全部联动接收器。
      *
-     * <p>不再按服务器地址做白名单门控：E33Chat 只有 14 条通道，白名单最多只能撤掉这 14 条，
+     * <p>不再按服务器地址做白名单门控：E33Chat 只有 16 条通道，白名单最多只能撤掉这 16 条，
      * 管不了其它模组，无法保证 Paper 的 127 条总上限；真正裁总量的是通道节食
      * （{@code ChannelRegistrationDietMixin}）。这里始终注册，首次进服即可用联动；
      * 只有硬关文件 {@code no-custom-channels.flag} 能阻止声明。
@@ -220,7 +220,8 @@ public class ChatBubbleClientSetup implements ClientModInitializer {
             com.niuqu.chatbubble.network.GroupInviteEventPayload.ID.id(),
             // 玩家互动动作（S2C 一条）：服务端校验后按会话范围转发的动作消息。
             // C2S（player_action）方向客户端不注册接收器。
-            com.niuqu.chatbubble.network.PlayerActionRelayPayload.ID.id());
+            com.niuqu.chatbubble.network.PlayerActionRelayPayload.ID.id(),
+            com.niuqu.chatbubble.network.ImageMessageRelayPayload.ID.id());
     }
 
     /** 本连接当前是否注册着我们的接收器。 */
@@ -238,7 +239,7 @@ public class ChatBubbleClientSetup implements ClientModInitializer {
      * {@code minecraft:register}。Paper 这类严格校验自定义载荷的服务端会直接以
      * "Invalid custom payload" 踢人。客户端在配置阶段无法得知服务端装了什么模组，因此
      * "Invalid custom payload" 踢人。这里不再按服务器地址做白名单门控：E33Chat 自己的
-     * 14 条通道管不了其它模组，也保证不了 Paper 的 127 条总上限；总量交给通道节食
+     * 16 条通道管不了其它模组，也保证不了 Paper 的 127 条总上限；总量交给通道节食
      * （{@code ChannelRegistrationDietMixin}）。通道在每个连接边界统一注册/注销，
      * 首次进服即可用联动。
      * <p><b>幂等</b>：本次连接已经注册过就直接返回；注册失败会回滚（把已登记的 id 全部注销），
@@ -322,6 +323,15 @@ public class ChatBubbleClientSetup implements ClientModInitializer {
                             com.niuqu.chatbubble.store.GroupStore.applyInviteEvent(payload);
                         } catch (Throwable t) {
                             ChatMessageStore.debugLog("[e33chat] group_invite_event handler failed | " + t);
+                        }
+                    }));
+            ClientPlayNetworking.registerGlobalReceiver(
+                com.niuqu.chatbubble.network.ImageMessageRelayPayload.ID, (payload, context) ->
+                    context.client().execute(() -> {
+                        try {
+                            com.niuqu.chatbubble.image.ImageMessageClient.receive(payload);
+                        } catch (Throwable t) {
+                            ChatMessageStore.debugLog("[e33chat] image_message_relay handler failed | " + t);
                         }
                     }));
             // 玩家互动动作：按 scope 插进对应会话（公屏 / 群聊 / 私聊），系统信息样式一行。
@@ -475,7 +485,7 @@ public class ChatBubbleClientSetup implements ClientModInitializer {
         // 自定义载荷通道 = 服务端联动功能的前提，但 Fabric 会把「客户端能收哪些通道」的声明
         // 发给服务端（Fabric 服：配置阶段收到 c:register 后回一份 PLAY 相位的 c:register；
         // Paper/vanilla：PLAY 阶段刚拿到 GameJoin 时发 minecraft:register）。Paper 这类严格
-        // 校验的服务端会直接以 "Invalid custom payload" 踢人。E33Chat 自己的 14 条通道不再按
+        // 校验的服务端会直接以 "Invalid custom payload" 踢人。E33Chat 自己的 16 条通道不再按
         // 服务器地址做白名单门控：白名单无法控制其它模组的通道，也保证不了 Paper 的 127 条
         // 总上限；总量由通道节食（ChannelRegistrationDietMixin）负责。
         //   config/e33chat/no-custom-channels.flag -> 任何情况下都不声明（硬关）

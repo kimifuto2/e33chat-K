@@ -14,6 +14,8 @@ import com.niuqu.chatbubble.network.GroupInviteRespondPayload;
 import com.niuqu.chatbubble.network.GroupKickPayload;
 import com.niuqu.chatbubble.network.GroupLeavePayload;
 import com.niuqu.chatbubble.network.GroupMessagePayload;
+import com.niuqu.chatbubble.network.ImageMessagePayload;
+import com.niuqu.chatbubble.network.ImageMessageRelayPayload;
 import com.niuqu.chatbubble.network.GroupMessageRelayPayload;
 import com.niuqu.chatbubble.network.GroupRenamePayload;
 import com.niuqu.chatbubble.network.GroupSyncPayload;
@@ -244,6 +246,21 @@ public class ChatBubbleMod implements ModInitializer {
         // 权威词条与发送者正式名，按 scope 只发给范围内的人（不回给发送者）。
         PayloadTypeRegistry.serverboundPlay().register(PlayerActionPayload.ID, PlayerActionPayload.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(PlayerActionRelayPayload.ID, PlayerActionRelayPayload.CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(ImageMessagePayload.ID, ImageMessagePayload.CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(ImageMessageRelayPayload.ID, ImageMessageRelayPayload.CODEC);
+
+        ServerPlayNetworking.registerGlobalReceiver(ImageMessagePayload.ID, (payload, context) -> {
+            try {
+                if (!payload.isValid()) {
+                    srvLog("image_message ignored | invalid payload | " + payload);
+                    return;
+                }
+                com.niuqu.chatbubble.server.ImageMessageServer.handle(
+                    context.server(), context.player(), payload);
+            } catch (Throwable t) {
+                srvLog("image_message failed | " + t);
+            }
+        });
 
         // 动作消息接收器：与群聊接收器同一套约定（整体 try/catch —— 异常绝不允许冒到
         // 网络层，否则服务端会直接断开玩家；payload receiver 已在服务端线程执行）。
