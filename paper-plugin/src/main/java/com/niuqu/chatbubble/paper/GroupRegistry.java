@@ -649,6 +649,30 @@ final class GroupRegistry {
             + " | preview=" + McCodec.preview(content));
     }
 
+    /** P3：把图片消息转发给群内**其他**在线成员。 */
+    static synchronized void relayImage(Plugin plugin, Player sender,
+                                        ImageMessageWire.Inbound payload, byte[] relay, String hash) {
+        Group g = byId(payload == null ? null : payload.groupId());
+        if (g == null) {
+            log("image ignored | unknown group | group=" + (payload == null ? "null" : payload.groupId()));
+            return;
+        }
+        if (sender == null || !g.hasMember(sender.getUniqueId())) {
+            log("image denied | not a member | sender=" + name(sender) + " | " + g);
+            return;
+        }
+        int n = 0;
+        for (UUID uuid : g.memberIds()) {
+            if (sender.getUniqueId().equals(uuid)) continue;
+            Player p = online(uuid);
+            if (p == null) continue;
+            send(p, E33Channels.IMAGE_MESSAGE_RELAY, relay);
+            n++;
+        }
+        log("image | from=" + sender.getName() + " | " + g + " | recipients=" + n
+            + " | hash=" + hash + " | preview=" + McCodec.preview(payload.content()));
+    }
+
     /** 登录补发：把该玩家所属的全部群逐个同步下去（客户端因此不需要本地保存成员表）。 */
     static synchronized void syncAllTo(Player player) {
         if (player == null) {

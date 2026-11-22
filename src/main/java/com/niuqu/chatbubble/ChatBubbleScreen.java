@@ -30,6 +30,8 @@ import com.niuqu.chatbubble.ui.EmoteStore;
 import com.niuqu.chatbubble.ui.ImageMessageComposer;
 import com.niuqu.chatbubble.ui.ImageViewerOverlay;
 import com.niuqu.chatbubble.image.ImageBatchUploader;
+import com.niuqu.chatbubble.image.ImageMessageClient;
+import com.niuqu.chatbubble.network.ImageMessagePayload;
 import com.niuqu.chatbubble.image.BracketCodec;
 import com.niuqu.chatbubble.image.ImageEntry;
 import com.niuqu.chatbubble.image.ImageLoader;
@@ -5268,7 +5270,7 @@ if (cmpLogged < 3 && quoteSenderMatches(m, owner.replySender())) {
         uploadBusyTicks = 60;
         ImageBatchUploader.upload(files, urls -> {
             uploadBusyTicks = 0;
-            sendImageBatch(captionFinal, urls);
+            sendImageBatchOrPayload(captionFinal, urls);
         }, () -> {
             uploadBusyTicks = 0;
             uploadToastTicks = 60;
@@ -5276,6 +5278,55 @@ if (cmpLogged < 3 && quoteSenderMatches(m, owner.replySender())) {
             if (!captionFinal.isEmpty() && chatField.getText().isEmpty()) chatField.setText(captionFinal);
             setFocused(chatField);
         });
+    }
+
+    /**
+     * P2/P3 优先：服务端（Fabric 模组或 Paper 插件）支持 image_message 时，把 9 张图
+     * 放进一条专用载荷，不再受聊天 256 字符限制；不支持时才退回旧的文本分条。
+     */
+    private void sendImageBatchOrPayload(String caption, java.util.List<String> urls) {
+        StringBuilder content = new StringBuilder(caption == null ? "" : caption);
+        for (String url : urls) {
+            if (content.length() > 0) content.append(' ');
+            content.append("[[CICode,url=").append(url).append("]]");
+        }
+        String scope;
+        String groupId = "";
+        String targetName = "";
+        if (isGroupConversation()) {
+            java.util.UUID gid = currentGroupId();
+            if (gid == null) { sendImageBatch(caption, urls); return; }
+            scope = ImageMessagePayload.SCOPE_GROUP;
+            groupId = gid.toString();
+        } else if (whisperPartner != null && !whisperPartner.isBlank()) {
+            scope = ImageMessagePayload.SCOPE_PRIVATE;
+            targetName = whisperPartner;
+        } else {
+            scope = ImageMessagePayload.SCOPE_PUBLIC;
+        }
+        String text = content.toString();
+        String hash = String.valueOf(text.hashCode());
+        ImageMessagePayload payload = new ImageMessagePayload(scope, groupId, targetName, text, hash);
+        if (!ClientPlayNetworking.canSend(ImageMessagePayload.ID)) {
+            sendImageBatch(caption, urls);
+            return;
+        }
+        try {
+            ClientPlayNetworking.send(payload);
+            try {
+                ImageMessageClient.addLocal(payload);
+            } catch (Throwable localError) {
+                ChatMessageStore.debugLog("[e33chat] image local echo failed | " + localError);
+            }
+            scrollToBottom = true;
+            client.inGameHud.getChatHud().addToMessageHistory(text);
+            historyPos = client.inGameHud.getChatHud().getMessageHistory().size();
+            ChatMessageStore.debugLog("[e33chat] image_message send | scope=" + scope
+                + " | images=" + urls.size() + " | len=" + text.length());
+        } catch (Throwable t) {
+            ChatMessageStore.debugLog("[e33chat] image_message failed, text fallback | " + t);
+            sendImageBatch(caption, urls);
+        }
     }
 
     /** 一条聊天行放不下 9 个图片 URL 时自动分条（原版/Paper 聊天通常 256 字符）。 */
