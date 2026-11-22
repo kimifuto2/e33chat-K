@@ -32,16 +32,22 @@ public record ConfigSyncV2Payload(boolean useTpa, List<String> chatTemplates,
         )
     );
 
+    public static final int MAX_LIST = 64;
+    public static final int MAX_ITEM = 512;
+
     static List<String> readList(FriendlyByteBuf buf) {
         int count = buf.readInt();
+        if (count < 0 || count > MAX_LIST) throw new IllegalArgumentException("bad template count");
         List<String> out = new ArrayList<>(count);
-        for (int i = 0; i < count; i++) out.add(buf.readUtf());
+        for (int i = 0; i < count; i++) out.add(GroupWire.readString(buf, MAX_ITEM));
         return out;
     }
 
     static void writeList(FriendlyByteBuf buf, List<String> list) {
-        buf.writeInt(list.size());
-        for (String s : list) buf.writeUtf(s);
+        List<String> src = list == null ? List.of() : list;
+        int n = Math.min(src.size(), MAX_LIST);
+        buf.writeInt(n);
+        for (int i = 0; i < n; i++) GroupWire.writeString(buf, src.get(i), MAX_ITEM);
     }
 
     @Override

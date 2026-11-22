@@ -41,10 +41,19 @@ public final class GroupWire {
         buf.writeUtf(clamp(s, MAX_CONTENT));
     }
 
+    /** 带显式字符上限的写入；图片消息等长文本使用，避免被 512 上限误截。 */
+    public static void writeString(FriendlyByteBuf buf, String s, int max) {
+        buf.writeUtf(clamp(s, max));
+    }
+
     /** 读字符串：读不到（旧端少字段）或损坏时返回空串。 */
     public static String readString(FriendlyByteBuf buf) {
+        return readString(buf, 32767);
+    }
+
+    public static String readString(FriendlyByteBuf buf, int max) {
         try {
-            return buf.isReadable() ? buf.readUtf() : "";
+            return buf.isReadable() ? buf.readUtf(max) : "";
         } catch (Throwable t) {
             return "";
         }

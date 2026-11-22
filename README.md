@@ -1,7 +1,9 @@
 # E33Chat · Minecraft 26.3 Fabric 版
 
 > **本分支：`mc26.3` · Minecraft 26.3（26.x 移植线）**
-> 产物：**`e33chat-Fabric-26.3-3.2.1.jar`**（754,730 字节 / ≈725 KiB） · 模组版本 **3.2.1**
+> 产物：**`e33chat-Fabric-26.3-3.2.1.jar`**（767,493 字节 / ≈749 KiB） · 模组版本 **3.2.1**
+>
+> 本轮 3.2.1 审查修补：图片载荷 8192；群聊仅群主邀请/踢人、群主可转让、群主 60 天未登录自动解散；服务器 `/e33chat group list|delete` 管理命令；媒体上传会话/配额加固；网络解码上限；Paper 超 4096 群不截断、读取失败只读；群/服务端配置原子写。
 > 仓库：[kimifuto2/e33chat-K](https://github.com/kimifuto2/e33chat-K) · 上游：[E33EPUS/E33Chat](https://github.com/E33EPUS/E33Chat)（MIT）
 >
 > 在 1.21.11 移植/增强版的基础上，把客户端**移植到 Minecraft 26.3**：功能集与 `main` 分支同源，主要差异在构建链与 26.x 平台 API（见「26.x 移植说明」）。
@@ -14,9 +16,9 @@
 
 | 分支 | Minecraft | 定位 | 产物 jar（3.2.1） | 大小 |
 |---|---|---|---|---|
-| `main` | 1.21.11 | 稳定线 | `e33chat-Fabric-1.21.11-3.2.1.jar` | 751,358 B |
-| **`mc26.3`**（本分支） | 26.3 | 26.x 移植线 | `e33chat-Fabric-26.3-3.2.1.jar` | 754,730 B |
-| `mc26.2` | 26.2 | 26.x 移植线 | `e33chat-Fabric-26.2-3.2.1.jar` | 754,754 B |
+| `main` | 1.21.11 | 稳定线 | `e33chat-Fabric-1.21.11-3.2.1.jar` | 765,001 B |
+| **`mc26.3`**（本分支） | 26.3 | 26.x 移植线 | `e33chat-Fabric-26.3-3.2.1.jar` | 767,493 B |
+| `mc26.2` | 26.2 | 26.x 移植线 | `e33chat-Fabric-26.2-3.2.1.jar` | 767,517 B |
 
 > 三个分支都在 **<https://github.com/kimifuto2/e33chat-K>** 下。**26.x 移植线**指 Mojang 改用年份版本号之后的版本，构建链与 1.21.11 差异很大（Java 25 / Gradle 9.8+ / Loom 1.19.3 / **不再混淆**）；`mc26.2` 与本分支环境基本相同，只有 Minecraft / Fabric API / 输入体系（GLFW vs SDL）不同（见「26.x 移植说明」最后一节）。
 
@@ -323,7 +325,7 @@ gradle build
 
 | 文件 | 大小 |
 |---|---|
-| `build/libs/e33chat-Fabric-26.3-3.2.1.jar` | 754,730 B |
+| `build/libs/e33chat-Fabric-26.3-3.2.1.jar` | 767,493 B |
 | `build/libs/e33chat-Fabric-26.3-3.2.1-sources.jar` | 525,443 B |
 
 ---
