@@ -138,8 +138,11 @@ public final class ImageMessageComposer {
             }
             RoundRectRenderer.fill(g, ex, ty, ex + ts, ty + ts, 4f,
                 ChatBubbleTheme.alphaBlend(c.inputBg(), a255));
-            g.drawText(font, "+", ex + ts / 2 - 3, ty + (ts - font.fontHeight) / 2,
+            g.getMatrices().pushMatrix();
+            g.getMatrices().translate(ex + ts / 2f, ty + ts / 2f);
+            g.drawText(font, "+", -font.getWidth("+") / 2, -font.fontHeight / 2,
                 ChatBubbleTheme.alphaBlend(c.textPrimary(), a255), false);
+            g.getMatrices().popMatrix();
         }
     }
 

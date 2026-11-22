@@ -155,7 +155,12 @@ public final class PublicChatOverlay {
 
         TextRenderer tr = mc.textRenderer;
         int screenW = mc.getWindow().getScaledWidth();
-        int panelW = Math.max(MIN_PANEL_W, Math.min(PANEL_W, screenW - 8));
+        // 最大宽度自适应「屏幕左边界到物品栏左边界」的可用间距：高 GUI scale 下不能固定
+        // 220px 占掉半个屏幕（3x 时 220 GUI px = 660 物理 px，极挡视野）。保留 28% 余量。
+        int hotbarLeft = screenW / 2 - 91;
+        int hotbarGap = Math.max(0, hotbarLeft - x - 8);
+        int adaptiveMax = Math.max(MIN_PANEL_W, (int) (hotbarGap * 0.72f));
+        int panelW = Math.max(MIN_PANEL_W, Math.min(PANEL_W, Math.min(screenW - 8, adaptiveMax)));
         int textW = panelW - PAD * 2;
         long now = System.currentTimeMillis();
 
