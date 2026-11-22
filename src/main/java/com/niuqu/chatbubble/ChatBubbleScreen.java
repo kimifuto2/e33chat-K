@@ -430,6 +430,9 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
     private long inputEditorStart, inputEditorCloseStart;
     private int inputEditorScroll;
     private boolean inputEditorDragging;
+    private String inputEditorText = "";
+    private int inputEditorCursor;
+    private int inputEditorAnchor;
     /** 最近一次鼠标拖拽/按下位置：用于按住不动时每 tick 继续横向自动滚动选字。 */
     private double lastInputDragX, lastInputDragY;
     /** 只有真正发生过 mouseDragged 才允许 tick 自动滚选；单击也会 setDragging(true)。 */
@@ -1629,6 +1632,7 @@ private float getBarAlpha() {
             activeGroupModal.ensureLayout();
             if (activeGroupModal.keyPressed(input)) return true;
         }
+        if (inputEditorOpen) return handleInputEditorKey(input);
         int keyCode = input.key();
         int scanCode = input.scancode();
         int modifiers = input.modifiers();
@@ -1779,6 +1783,7 @@ if (this.getFocused() != null && this.getFocused().keyPressed(input))
             activeGroupModal.ensureLayout();
             if (activeGroupModal.charTyped(input)) return true;
         }
+        if (inputEditorOpen) return handleInputEditorChar(input.codepoint());
         // 等价于原版 ContainerEventHandler#charTyped：转给当前聚焦的子控件
         net.minecraft.client.gui.Element focused = this.getFocused();
         return focused != null && focused.charTyped(input);
@@ -1811,8 +1816,8 @@ if (this.getFocused() != null && this.getFocused().keyPressed(input))
         if (inputEditorOpen) {
             int[] er = inputEditorRect();
             if (mouseX >= er[0] && mouseX <= er[0] + er[2] && mouseY >= er[1] && mouseY <= er[1] + er[3]) {
-                List<InputEditorLine> ls = buildInputEditorLines(chatField.getText(), er[2] - 14);
-                int visible = Math.max(1, (er[3] - 10) / (textRenderer.fontHeight + 1));
+                List<InputEditorLine> ls = buildInputEditorLines(inputEditorText, er[2] - 14);
+                int visible = Math.max(1, (er[3] - 22) / (textRenderer.fontHeight + 1));
                 int maxScroll = Math.max(0, ls.size() - visible);
                 inputEditorScroll = MathHelper.clamp(inputEditorScroll - (int) scrollY, 0, maxScroll);
                 return true;
@@ -2346,8 +2351,8 @@ if (quotePressPending
         // 按超出的距离推进光标（selecting=true），让被隐藏的文字能被连续选中。
         if (inputEditorOpen && inputEditorDragging && isDragging()) {
             int[] er = inputEditorRect();
-            List<InputEditorLine> ls = buildInputEditorLines(chatField.getText(), er[2] - 14);
-            chatField.setCursor(inputEditorCursorAt(click.x(), click.y(), ls), true);
+            List<InputEditorLine> ls = buildInputEditorLines(inputEditorText, er[2] - 14);
+            inputEditorCursor = inputEditorCursorAt(click.x(), click.y(), ls);
             return true;
         }
         if (handleInputDragScroll(click.x(), click.y())) return true;
@@ -4968,10 +4973,9 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
     }
 
     // ===== 输入框「展开全文」编辑面板 =========================================
-    // 原版 TextFieldWidget 只有单行，长消息/多图代码在输入框里只能看到一小段。这里不另造
-    // 编辑器控件：面板只负责把 chatField 的全文按宽度折行显示并提供光标定位，键盘输入仍
-    // 交给原版 chatField（它始终是 focused），因此两边文本天然双向同步、撤销/选区/粘贴
-    // Ctrl+A 等按键行为完全沿用原版。
+    // 面板打开时原输入框文本**不动**，只在面板自己的 buffer 里编辑；按回车或「完成」时
+    // 才把 buffer 写回 chatField 并发送。面板自己维护 cursor/anchor 和选区，因此拖选、
+    // Ctrl+A/C/X/V、复制粘贴都不依赖原版单行 TextFieldWidget 的横向滚动。
 
     private static final class InputEditorLine {
         final String text;
@@ -4985,6 +4989,13 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
         int w = panelW - 8;
         int y = barTop - 4 - h;
         return new int[]{x, y, w, h};
+    }
+
+    /** 「完成」按钮矩形（面板底部右侧）。 */
+    private int[] inputEditorDoneRect() {
+        int[] r = inputEditorRect();
+        int bw = 46, bh = 16;
+        return new int[]{r[0] + r[2] - bw - 6, r[1] + r[3] - bh - 4, bw, bh};
     }
 
     private List<InputEditorLine> buildInputEditorLines(String text, int maxW) {
@@ -5016,6 +5027,8 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
         int lineH = textRenderer.fontHeight + 1;
         int contentX = r[0] + 6;
         int firstY = r[1] + 5;
+        int contentBottom = r[1] + r[3] - 22;
+        int visible = Math.max(1, (contentBottom - firstY) / lineH);
         int line = MathHelper.clamp((int) ((my - firstY) / lineH) + inputEditorScroll, 0, lines.size() - 1);
         InputEditorLine l = lines.get(line);
         int rel = MathHelper.clamp((int) (mx - contentX), 0, Math.max(0, textRenderer.getWidth(l.text)));
@@ -5025,21 +5038,38 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
             if (w >= rel) { best = i; break; }
             best = i;
         }
-        return MathHelper.clamp(l.start + best, 0, chatField.getText().length());
+        return MathHelper.clamp(l.start + best, 0, inputEditorText.length());
     }
 
     private void toggleInputEditor() {
-        if (inputEditorOpen) { closeInputEditor(); return; }
+        if (inputEditorOpen) { cancelInputEditor(); return; }
+        inputEditorText = chatField.getText();
+        inputEditorCursor = inputEditorText.length();
+        inputEditorAnchor = inputEditorCursor;
         inputEditorOpen = true;
         inputEditorStart = Util.getMeasuringTimeMs();
         inputEditorCloseStart = 0;
         inputEditorScroll = 0;
-        setFocused(chatField);
+        inputEditorDragging = false;
     }
 
-    private void closeInputEditor() {
+    private void cancelInputEditor() {
         if (!inputEditorOpen || inputEditorCloseStart > 0) return;
+        inputEditorDragging = false;
         beginPopupClose(s -> inputEditorCloseStart = s, () -> inputEditorOpen = false);
+    }
+
+    /** 回车/完成：把面板 buffer 写回原输入框，然后立即走正常发送流程。 */
+    private void commitInputEditor() {
+        if (!inputEditorOpen) return;
+        String text = inputEditorText;
+        inputEditorOpen = false;
+        inputEditorCloseStart = 0;
+        inputEditorDragging = false;
+        chatField.setText(text.replace('\n', ' ').replace('\r', ' '));
+        setFocused(chatField);
+        chatField.setCursorToEnd(false);
+        sendMessage();
     }
 
     private boolean isMouseOverInputEditorArrow(double mx, double my) {
@@ -5049,6 +5079,129 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
         int ax = imageX - INPUT_EDITOR_RESERVE;
         int iconY = barTop + (BAR_H - ICON_S) / 2;
         return mx >= ax - 1 && mx <= ax + 11 && my >= iconY && my <= iconY + ICON_S;
+    }
+
+    private void clampInputEditorCursor() {
+        inputEditorCursor = MathHelper.clamp(inputEditorCursor, 0, inputEditorText.length());
+        inputEditorAnchor = MathHelper.clamp(inputEditorAnchor, 0, inputEditorText.length());
+    }
+
+    private boolean inputEditorHasSelection() {
+        return inputEditorAnchor != inputEditorCursor;
+    }
+
+    private void inputEditorDeleteSelection() {
+        if (!inputEditorHasSelection()) return;
+        int a = Math.min(inputEditorAnchor, inputEditorCursor);
+        int b = Math.max(inputEditorAnchor, inputEditorCursor);
+        inputEditorText = inputEditorText.substring(0, a) + inputEditorText.substring(b);
+        inputEditorCursor = inputEditorAnchor = a;
+    }
+
+    private void inputEditorInsert(String value) {
+        if (value == null || value.isEmpty()) return;
+        inputEditorDeleteSelection();
+        inputEditorText = inputEditorText.substring(0, inputEditorCursor) + value
+            + inputEditorText.substring(inputEditorCursor);
+        inputEditorCursor += value.length();
+        inputEditorAnchor = inputEditorCursor;
+        clampInputEditorCursor();
+    }
+
+    private void inputEditorMove(int target, boolean selecting) {
+        inputEditorCursor = MathHelper.clamp(target, 0, inputEditorText.length());
+        if (!selecting) inputEditorAnchor = inputEditorCursor;
+    }
+
+    private boolean handleInputEditorKey(net.minecraft.client.input.KeyInput input) {
+        int key = input.key();
+        boolean ctrl = (input.modifiers() & 0x2) != 0;
+        boolean shift = (input.modifiers() & 0x1) != 0;
+        if (key == 257
+            || key == 335) {
+            commitInputEditor();
+            return true;
+        }
+        if (key == 256) {
+            cancelInputEditor();
+            return true;
+        }
+        if (ctrl) {
+            if (key == 65) {
+                inputEditorAnchor = 0; inputEditorCursor = inputEditorText.length(); return true;
+            }
+            if (key == 67) {
+                if (inputEditorHasSelection()) {
+                    int a = Math.min(inputEditorAnchor, inputEditorCursor);
+                    int b = Math.max(inputEditorAnchor, inputEditorCursor);
+                    client.keyboard.setClipboard(inputEditorText.substring(a, b));
+                }
+                return true;
+            }
+            if (key == 88) {
+                if (inputEditorHasSelection()) {
+                    int a = Math.min(inputEditorAnchor, inputEditorCursor);
+                    int b = Math.max(inputEditorAnchor, inputEditorCursor);
+                    client.keyboard.setClipboard(inputEditorText.substring(a, b));
+                    inputEditorDeleteSelection();
+                }
+                return true;
+            }
+            if (key == 86) {
+                inputEditorInsert(client.keyboard.getClipboard());
+                return true;
+            }
+        }
+        if (key == 259) {
+            if (inputEditorHasSelection()) inputEditorDeleteSelection();
+            else if (inputEditorCursor > 0) {
+                inputEditorText = inputEditorText.substring(0, inputEditorCursor - 1) + inputEditorText.substring(inputEditorCursor);
+                inputEditorCursor--; inputEditorAnchor = inputEditorCursor;
+            }
+            return true;
+        }
+        if (key == 261) {
+            if (inputEditorHasSelection()) inputEditorDeleteSelection();
+            else if (inputEditorCursor < inputEditorText.length()) {
+                inputEditorText = inputEditorText.substring(0, inputEditorCursor) + inputEditorText.substring(inputEditorCursor + 1);
+            }
+            return true;
+        }
+        if (key == 263) {
+            inputEditorMove(inputEditorCursor - 1, shift); return true;
+        }
+        if (key == 262) {
+            inputEditorMove(inputEditorCursor + 1, shift); return true;
+        }
+        if (key == 265
+                || key == 264) {
+            List<InputEditorLine> ls = buildInputEditorLines(inputEditorText, inputEditorRect()[2] - 14);
+            int line = 0, col = 0;
+            for (int i = 0; i < ls.size(); i++) {
+                InputEditorLine l = ls.get(i);
+                if (inputEditorCursor >= l.start && inputEditorCursor <= l.start + l.text.length()) {
+                    line = i; col = inputEditorCursor - l.start; break;
+                }
+            }
+            int nl = MathHelper.clamp(line + (key == 264 ? 1 : -1), 0, ls.size() - 1);
+            InputEditorLine target = ls.get(nl);
+            inputEditorMove(target.start + Math.min(col, target.text.length()), shift);
+            return true;
+        }
+        if (key == 268) {
+            inputEditorMove(0, shift); return true;
+        }
+        if (key == 269) {
+            inputEditorMove(inputEditorText.length(), shift); return true;
+        }
+        return true; // 面板打开时吞掉所有其它按键，避免漏给原输入框
+    }
+
+    private boolean handleInputEditorChar(int codepoint) {
+        String s = new String(Character.toChars(codepoint));
+        if (s.equals("\n") || s.equals("\r")) return true;
+        inputEditorInsert(s);
+        return true;
     }
 
     private void renderInputEditor(DrawContext g, int mouseX, int mouseY) {
@@ -5063,40 +5216,50 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
         RoundRectRenderer.panel(g, r[0], r[1], r[2], r[3], 8f,
             ChatBubbleTheme.alphaBlend(c().popupBg(), (int) (238 * alpha)),
             ChatBubbleTheme.alphaBlend(c().divider(), a255));
-        String text = chatField.getText();
-        List<InputEditorLine> lines = buildInputEditorLines(text, r[2] - 14);
+        List<InputEditorLine> lines = buildInputEditorLines(inputEditorText, r[2] - 14);
         int lineH = textRenderer.fontHeight + 1;
         int contentX = r[0] + 6;
         int firstY = r[1] + 5;
-        int visible = Math.max(1, (r[3] - 10) / lineH);
+        int contentBottom = r[1] + r[3] - 22;
+        int visible = Math.max(1, (contentBottom - firstY) / lineH);
         int maxScroll = Math.max(0, lines.size() - visible);
         inputEditorScroll = MathHelper.clamp(inputEditorScroll, 0, maxScroll);
-        int txtColor = ChatBubbleTheme.alphaBlend(c().textPrimary(), a255);
+        int selA = Math.min(inputEditorAnchor, inputEditorCursor);
+        int selB = Math.max(inputEditorAnchor, inputEditorCursor);
         for (int i = 0; i < visible && i + inputEditorScroll < lines.size(); i++) {
             InputEditorLine l = lines.get(i + inputEditorScroll);
-            g.drawText(textRenderer, l.text, contentX, firstY + i * lineH, txtColor, false);
-        }
-        // 光标：映射到折行后的行/列，面板内也可见编辑位置。
-        int cursor = MathHelper.clamp(chatField.getCursor(), 0, text.length());
-        int caretLine = lines.size() - 1;
-        int caretCol = 0;
-        for (int i = 0; i < lines.size(); i++) {
-            InputEditorLine l = lines.get(i);
-            if (cursor >= l.start && cursor <= l.start + l.text.length()) {
-                caretLine = i; caretCol = cursor - l.start; break;
+            int ly = firstY + i * lineH;
+            int a = Math.max(selA, l.start) - l.start;
+            int b = Math.min(selB, l.start + l.text.length()) - l.start;
+            if (b > a) {
+                int sx1 = contentX + textRenderer.getWidth(l.text.substring(0, a));
+                int sx2 = contentX + textRenderer.getWidth(l.text.substring(0, b));
+                g.fill(sx1, ly - 1, sx2, ly + textRenderer.fontHeight, ChatTextSelection.selectionBg());
             }
+            g.drawText(textRenderer, l.text, contentX, ly,
+                ChatBubbleTheme.alphaBlend(c().textPrimary(), a255), false);
         }
-        int cy = firstY + (caretLine - inputEditorScroll) * lineH;
-        if (cy >= firstY - 1 && cy <= r[1] + r[3]) {
-            InputEditorLine l = lines.get(caretLine);
-            int cx = contentX + textRenderer.getWidth(l.text.substring(0, Math.min(caretCol, l.text.length())));
-            g.fill(cx, cy, cx + 1, cy + textRenderer.fontHeight,
-                ChatBubbleTheme.alphaBlend(c().nameColor(), a255));
+        if (inputEditorCursor == inputEditorAnchor) {
+            int caretLine = lines.size() - 1;
+            int caretCol = 0;
+            for (int i = 0; i < lines.size(); i++) {
+                InputEditorLine l = lines.get(i);
+                if (inputEditorCursor >= l.start && inputEditorCursor <= l.start + l.text.length()) {
+                    caretLine = i; caretCol = inputEditorCursor - l.start; break;
+                }
+            }
+            int cy = firstY + (caretLine - inputEditorScroll) * lineH;
+            if (cy >= firstY - 1 && cy <= contentBottom) {
+                InputEditorLine l = lines.get(caretLine);
+                int cx = contentX + textRenderer.getWidth(l.text.substring(0, Math.min(caretCol, l.text.length())));
+                g.fill(cx, cy, cx + 1, cy + textRenderer.fontHeight,
+                    ChatBubbleTheme.alphaBlend(c().nameColor(), a255));
+            }
         }
         if (maxScroll > 0) {
             int trackX = r[0] + r[2] - 4;
             int trackTop = r[1] + 4;
-            int trackH = r[3] - 8;
+            int trackH = contentBottom - trackTop;
             g.fill(trackX, trackTop, trackX + 2, trackTop + trackH,
                 ChatBubbleTheme.alphaBlend(c().divider(), a255));
             int thumbH = Math.max(8, trackH * visible / Math.max(1, lines.size()));
@@ -5104,19 +5267,40 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
             g.fill(trackX, thumbY, trackX + 2, thumbY + thumbH,
                 ChatBubbleTheme.alphaBlend(c().quoteBar(), a255));
         }
+        // 底部完成按钮
+        int[] d = inputEditorDoneRect();
+        boolean hover = mouseX >= d[0] && mouseX <= d[0] + d[2] && mouseY >= d[1] && mouseY <= d[3];
+        RoundRectRenderer.fill(g, d[0], d[1], d[0] + d[2], d[1] + d[3], 5f,
+            ChatBubbleTheme.alphaBlend(c().textMuted(), a255));
+        RoundRectRenderer.fill(g, d[0] + 1, d[1] + 1, d[0] + d[2] - 1, d[1] + d[3] - 1, 4f,
+            ChatBubbleTheme.alphaBlend(hover ? c().popupHover() : c().inputBg(), a255));
+        String done = "完成";
+        g.drawText(textRenderer, done, d[0] + (d[2] - textRenderer.getWidth(done)) / 2,
+            d[1] + (d[3] - textRenderer.fontHeight) / 2,
+            ChatBubbleTheme.alphaBlend(c().textPrimary(), a255), false);
+        String hint = "Enter 发送";
+        g.drawText(textRenderer, hint, contentX, d[1] + (d[3] - textRenderer.fontHeight) / 2,
+            ChatBubbleTheme.alphaBlend(c().textMuted(), a255), false);
     }
 
-    /** 返回 true 表示这次点击已被编辑面板吞掉；点击面板外只关闭面板，让原点击继续。 */
+    /** 返回 true 表示这次点击已被编辑面板吞掉。 */
     private boolean handleInputEditorClick(double mx, double my) {
         if (!inputEditorOpen) return false;
+        int[] d = inputEditorDoneRect();
+        if (mx >= d[0] && mx <= d[0] + d[2] && my >= d[1] && my <= d[1] + d[3]) {
+            commitInputEditor();
+            return true;
+        }
         int[] r = inputEditorRect();
-        boolean inside = mx >= r[0] && mx <= r[0] + r[2] && my >= r[1] && my <= r[1] + r[3];
-        if (!inside) { closeInputEditor(); return false; }
-        List<InputEditorLine> lines = buildInputEditorLines(chatField.getText(), r[2] - 14);
-        chatField.setCursor(inputEditorCursorAt(mx, my, lines), false);
-        setFocused(chatField);
-        setDragging(true);
+        if (mx < r[0] || mx > r[0] + r[2] || my < r[1] || my > r[1] + r[3]) {
+            cancelInputEditor();
+            return false;
+        }
+        List<InputEditorLine> lines = buildInputEditorLines(inputEditorText, r[2] - 14);
+        inputEditorCursor = inputEditorCursorAt(mx, my, lines);
+        inputEditorAnchor = inputEditorCursor;
         inputEditorDragging = true;
+        setDragging(true);
         return true;
     }
 
