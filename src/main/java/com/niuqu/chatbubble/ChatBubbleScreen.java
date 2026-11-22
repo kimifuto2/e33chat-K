@@ -5040,16 +5040,17 @@ boolean hoverCopy = mouseX >= menuX && mouseX <= menuX + CTX_W
         input.moveCursorToEnd(false);
     }
 
-    /** 输入框右上角圆形展开按钮：圆心正好在右上圆角的圆心（视觉框 right-4, top+4）。 */
+    /** 输入框右上角圆形展开按钮：圆心落在右上圆角弧线上（45° 点）。 */
     private int[] inputEditorButtonRect() {
         int ibX = inputBaseX();
         int ibW = input.getWidth() + INPUT_CURSOR_RESERVE + INPUT_EDITOR_RESERVE;
         int ibY = inputBarY();
         int d = INPUT_EDITOR_BTN_S;
-        // 输入框视觉矩形 = ibX-2 .. ibX+ibW+2、ibY-2 .. ibY+ibH+2，圆角半径 6；
-        // 右上圆角圆心 = (视觉右 - 6, 视觉上 + 6) = (ibX+ibW-4, ibY+4)。
-        int cx = ibX + ibW - 4;
-        int cy = ibY + 4;
+        // 输入框视觉矩形 = ibX-2 .. ibX+ibW+2、ibY-2 .. ibY+ibH+2，圆角半径 r=6。
+        // 右上圆角圆心 = (视觉右-r, 视觉上+r)；45° 弧点 = 圆心 + (r/√2, -r/√2)。
+        // r=6 时该点取整正好是内框右上角 (ibX+ibW, ibY)，即圆角边上。
+        int cx = ibX + ibW;
+        int cy = ibY;
         return new int[]{cx - d / 2, cy - d / 2, d, d};
     }
 
