@@ -210,6 +210,8 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
     final ImageMessageComposer imageComposer = new ImageMessageComposer();
     final ImageViewerOverlay imageViewer = new ImageViewerOverlay();
     private final java.util.List<ImageHit> imageHits = new java.util.ArrayList<>();
+    /** 真正文字气泡的命中矩形（不含图片消息末尾那条覆盖整条消息的粗略 span）。 */
+    private final java.util.List<int[]> textBubbleRects = new java.util.ArrayList<>();
 
     private record ImageHit(String url, int x, int y, int w, int h, int messageIndex) {}
     final ChatSettingsMenu settingsMenu = new ChatSettingsMenu();
@@ -1661,6 +1663,7 @@ private float getBarAlpha() {
         // Ctrl+V with an image in the clipboard uploads it and inserts the code;
         // on the custom-emote tab it adds the image to the emote pack instead.
         if (input.isPaste()) {
+            if (pasteImageCodesFromClipboard()) return true;
             if (emojiPanel.visible && emojiPanel.tab == 2) {
                 addClipboardEmote();
             } else {
@@ -2169,6 +2172,17 @@ quickChatInput.setVisible(true);
             }
         }
 
+        // 文字气泡右键：图片消息的说明文字也有自己的气泡，不能因为它带图就跳过。
+        if (button == 1) {
+            for (int[] r : textBubbleRects) {
+                if (mouseX >= r[0] && mouseX <= r[0] + r[2]
+                    && mouseY >= r[1] && mouseY <= r[1] + r[3]) {
+                    contextMsgIndex = r[4]; contextX = (int) mouseX; contextY = (int) mouseY;
+                    return true;
+                }
+            }
+        }
+
         // Bubble right-click
         if (button == 1) {
             for (int[] r : bubbleRects) {
@@ -2549,6 +2563,35 @@ boolean selDrag = textSelection.isDragActive();
             if (prep == null) return; // no image in clipboard
             minecraft.execute(() -> EmoteStore.addBytes(prep.bytes(), "paste_" + System.currentTimeMillis() + ".png"));
         });
+    }
+
+    /** 复制图片消息后再粘贴：把 CICode/E33Emote 代码还原成待发送图片，而不是把代码塞进输入框。 */
+    private boolean pasteImageCodesFromClipboard() {
+        String clip;
+        try {
+            clip = minecraft.keyboardHandler.getClipboard();
+        } catch (Throwable t) {
+            return false;
+        }
+        if (clip == null || !clip.contains("[[CICode")) return false;
+        BracketCodec.ParseResult parsed = BracketCodec.parse(net.minecraft.network.chat.Component.literal(clip));
+        if (parsed.images().isEmpty()) return false;
+        int added = 0;
+        for (BracketCodec.ImageRef ref : parsed.images()) {
+            if (ref.emote()) continue;
+            if (ref.url().startsWith("file://")) {
+                String path = extractLocalPath("[[CICode,url=" + ref.url() + "]]");
+                if (path != null) {
+                    java.io.File f = new java.io.File(path);
+                    if (imageComposer.add(f)) added++;
+                }
+            } else if (imageComposer.addUrl(ref.url())) {
+                added++;
+            }
+        }
+        if (added == 0) return false;
+        setFocused(input);
+        return true;
     }
 
     private void startUploadFromClipboard() {
@@ -3477,6 +3520,7 @@ boolean selDrag = textSelection.isDragActive();
         }
         bubbleRects.clear();
         imageHits.clear();
+        textBubbleRects.clear();
         inviteButtons.clear();
         clickableSpans.clear();
         quoteRects.clear();
@@ -4097,6 +4141,7 @@ boolean showAvatar = !(ChatBubbleClientSetup.config().hideRepeatedAvatars() != n
         }
 
         bubbleRects.add(new int[]{bubbleX, bubbleY, bubbleW, bubbleH, index});
+        textBubbleRects.add(new int[]{bubbleX, bubbleY, bubbleW, bubbleH, index});
     }
 
     /**
@@ -4245,6 +4290,7 @@ boolean showAvatar = !(ChatBubbleClientSetup.config().hideRepeatedAvatars() != n
                     y + BUBBLE_PAD_Y + li * font.lineHeight, fgA, fb,
                     index, li, TextSpan.KIND_CONTENT, 1f);
             bubbleRects.add(new int[]{bubbleX, y, bubbleW, bubbleH, index});
+            textBubbleRects.add(new int[]{bubbleX, y, bubbleW, bubbleH, index});
             y += bubbleH + 2;
         }
 
@@ -5823,9 +5869,10 @@ if (cmpLogged < 3 && quoteSenderMatches(m, owner.replySender())) {
     }
 
     private void sendPendingImages() {
-        if (!imageComposer.hasFiles()) return;
+        if (!imageComposer.hasImages()) return;
         if (uploadBusyTicks > 0) return;
         java.util.List<java.io.File> files = imageComposer.files();
+        java.util.List<String> pastedUrls = imageComposer.urls();
         String caption = input.getValue().trim();
         if (pendingAction != null) {
             int n = actionPrefixLength(caption);
@@ -5837,14 +5884,21 @@ if (cmpLogged < 3 && quoteSenderMatches(m, owner.replySender())) {
         imageComposer.clear();
         input.setValue("");
         savedInput = "";
+        if (files.isEmpty()) {
+            sendImageBatchOrPayload(captionFinal, pastedUrls);
+            return;
+        }
         uploadBusyTicks = 60;
         ImageBatchUploader.upload(files, urls -> {
             uploadBusyTicks = 0;
-            sendImageBatchOrPayload(captionFinal, urls);
+            java.util.List<String> all = new java.util.ArrayList<>(pastedUrls);
+            all.addAll(urls);
+            sendImageBatchOrPayload(captionFinal, all);
         }, () -> {
             uploadBusyTicks = 0;
             uploadToastTicks = 60;
             imageComposer.addAll(files);
+            imageComposer.addAllUrls(pastedUrls);
             if (!captionFinal.isEmpty() && input.getValue().isEmpty()) input.setValue(captionFinal);
             setFocused(input);
         });
@@ -5945,7 +5999,7 @@ if (cmpLogged < 3 && quoteSenderMatches(m, owner.replySender())) {
     }
 
     private void sendMessage() {
-        if (imageComposer.hasFiles()) {
+        if (imageComposer.hasImages()) {
             sendPendingImages();
             return;
         }

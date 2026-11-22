@@ -1,11 +1,12 @@
 package com.niuqu.chatbubble.ui;
 
+import com.niuqu.chatbubble.image.ImageEntry;
+import com.niuqu.chatbubble.image.ImageLoader;
 import com.niuqu.chatbubble.render.ChatBubbleTheme;
 import com.niuqu.chatbubble.render.RoundRectRenderer;
 import com.niuqu.chatbubble.texture.ColoredTextureRenderer;
 import net.minecraft.client.gui.Font;
 import com.niuqu.chatbubble.render.UiCanvas;
-
 import net.minecraft.resources.Identifier;
 
 import java.io.File;
@@ -26,11 +27,33 @@ public final class ImageMessageComposer {
     private static final int GAP = 4;
 
     private final List<File> files = new ArrayList<>();
+    /** 复制聊天里的图片后直接粘贴：保留远端 URL，不把它退化成文字代码。 */
+    private final List<String> remoteUrls = new ArrayList<>();
 
+    /** 是否还有待发送图片（本地选择 + 远端 URL）。 */
+    public boolean hasImages() { return !files.isEmpty() || !remoteUrls.isEmpty(); }
     public boolean hasFiles() { return !files.isEmpty(); }
-    public boolean isFull() { return files.size() >= MAX_IMAGES; }
-    public int size() { return files.size(); }
+    public boolean isFull() { return size() >= MAX_IMAGES; }
+    public int size() { return files.size() + remoteUrls.size(); }
     public List<File> files() { return new ArrayList<>(files); }
+    public List<String> urls() { return new ArrayList<>(remoteUrls); }
+
+    /** 粘贴 CICode 时加入远端图片；只接受 http/https，去重并受 9 张上限约束。 */
+    public boolean addUrl(String url) {
+        if (url == null || isFull()) return false;
+        String u = url.trim();
+        if (!(u.startsWith("http://") || u.startsWith("https://"))) return false;
+        if (remoteUrls.contains(u) || files.stream().anyMatch(f -> u.equals(f.getPath()))) return false;
+        remoteUrls.add(u);
+        return true;
+    }
+
+    public int addAllUrls(List<String> incoming) {
+        int n = 0;
+        if (incoming == null) return 0;
+        for (String u : incoming) if (addUrl(u)) n++;
+        return n;
+    }
 
     public boolean add(File f) {
         if (f == null || !f.isFile() || isFull() || !isImage(f)) return false;
@@ -49,10 +72,15 @@ public final class ImageMessageComposer {
     }
 
     public void remove(int index) {
-        if (index >= 0 && index < files.size()) files.remove(index);
+        if (index < 0) return;
+        if (index < files.size()) files.remove(index);
+        else {
+            int r = index - files.size();
+            if (r < remoteUrls.size()) remoteUrls.remove(r);
+        }
     }
 
-    public void clear() { files.clear(); }
+    public void clear() { files.clear(); remoteUrls.clear(); }
 
     public static boolean isImage(File f) {
         if (f == null) return false;
@@ -71,14 +99,14 @@ public final class ImageMessageComposer {
     private int stripY(int barTop) { return Math.max(2, barTop - stripH() - 4); }
 
     public boolean isInsideStrip(double mx, double my, int panelX, int panelW, int barTop) {
-        return hasFiles() && mx >= panelX + 2 && mx <= panelX + panelW - 2
+        return hasImages() && mx >= panelX + 2 && mx <= panelX + panelW - 2
             && my >= stripY(barTop) && my <= stripY(barTop) + stripH();
     }
 
     public void render(UiCanvas g, int mouseX, int mouseY,
                        Font font, ChatBubbleTheme.Colors c,
                        int panelX, int panelW, int barTop, float alpha) {
-        if (!hasFiles()) return;
+        if (!hasImages()) return;
         int a255 = (int) (255 * alpha);
         int y = stripY(barTop);
         int x = panelX + 2;
@@ -89,18 +117,24 @@ public final class ImageMessageComposer {
             ChatBubbleTheme.alphaBlend(c.divider(), a255));
 
         int ts = thumbSize(panelW);
-        int total = files.size() + (isFull() ? 0 : 1);
+        int total = size() + (isFull() ? 0 : 1);
         int contentW = total * ts + (total - 1) * GAP;
         int startX = panelX + (panelW - contentW) / 2;
         int ty = y + (h - ts) / 2;
-        for (int i = 0; i < files.size(); i++) {
+        for (int i = 0; i < size(); i++) {
             int ex = startX + i * (ts + GAP);
             boolean hover = mouseX >= ex && mouseX <= ex + ts && mouseY >= ty && mouseY <= ty + ts;
             if (hover) {
                 RoundRectRenderer.fill(g, ex - 1, ty - 1, ex + ts + 1, ty + ts + 1, 4f,
                     ChatBubbleTheme.alphaBlend(c.popupHover(), a255));
             }
-            Identifier tex = EmoteStore.texture(files.get(i));
+            Identifier tex;
+            if (i < files.size()) {
+                tex = EmoteStore.texture(files.get(i));
+            } else {
+                ImageEntry entry = ImageLoader.getOrLoad(remoteUrls.get(i - files.size()));
+                tex = entry.state() == ImageEntry.State.LOADED ? entry.textureId() : null;
+            }
             if (tex != null) {
                 ColoredTextureRenderer.drawWithAlpha(g, tex, ex, ty, ts, ts, alpha);
             } else {
@@ -111,14 +145,14 @@ public final class ImageMessageComposer {
             }
             if (hover) {
                 // 右上角删除键：与其它图标按钮同构的 1px 主题描边 + 内层圆角底，
-                // 字形按 font.width/lineHeight 真居中（不能用固定 +4 偏移）。
+                // 字形按 font.getWidth/fontHeight 真居中（不能用固定 +4 偏移）。
                 int bs = 10;
                 int bx = ex + ts - bs, by = ty;
                 RoundRectRenderer.fill(g, bx, by, bx + bs, by + bs, 4f,
                     ChatBubbleTheme.alphaBlend(c.textMuted(), a255));
                 RoundRectRenderer.fill(g, bx + 1, by + 1, bx + bs - 1, by + bs - 1, 3f,
                     ChatBubbleTheme.alphaBlend(c.inputBg(), a255));
-                if (mouseX >= bx && mouseX <= bx + bs && mouseY >= by && mouseY <= by + bs) {
+                if (hover && mouseX >= bx && mouseX <= bx + bs && mouseY >= by && mouseY <= by + bs) {
                     RoundRectRenderer.fill(g, bx + 1, by + 1, bx + bs - 1, by + bs - 1, 3f,
                         ChatBubbleTheme.alphaBlend(c.popupHover(), a255));
                 }
@@ -130,7 +164,7 @@ public final class ImageMessageComposer {
             }
         }
         if (!isFull()) {
-            int ex = startX + files.size() * (ts + GAP);
+            int ex = startX + size() * (ts + GAP);
             boolean hover = mouseX >= ex && mouseX <= ex + ts && mouseY >= ty && mouseY <= ty + ts;
             if (hover) {
                 RoundRectRenderer.fill(g, ex - 1, ty - 1, ex + ts + 1, ty + ts + 1, 4f,
@@ -148,22 +182,22 @@ public final class ImageMessageComposer {
 
     /** @return 0..8 = 删除该下标；{@link #CLICK_ADD} = 继续添加；{@link #CLICK_NONE} = 无操作。 */
     public int handleClick(double mx, double my, int panelX, int panelW, int barTop) {
-        if (!hasFiles()) return CLICK_NONE;
+        if (!hasImages()) return CLICK_NONE;
         int y = stripY(barTop);
         int h = stripH();
         if (my < y || my > y + h) return CLICK_NONE;
         int ts = thumbSize(panelW);
-        int total = files.size() + (isFull() ? 0 : 1);
+        int total = size() + (isFull() ? 0 : 1);
         int contentW = total * ts + (total - 1) * GAP;
         int startX = panelX + (panelW - contentW) / 2;
         int ty = y + (h - ts) / 2;
-        for (int i = 0; i < files.size(); i++) {
+        for (int i = 0; i < size(); i++) {
             int ex = startX + i * (ts + GAP);
             // 删除命中区比视觉 ✕ 略大，避免 1px 难点
             if (mx >= ex + ts - 12 && mx <= ex + ts && my >= ty && my <= ty + 12) return i;
         }
         if (!isFull()) {
-            int ex = startX + files.size() * (ts + GAP);
+            int ex = startX + size() * (ts + GAP);
             if (mx >= ex && mx <= ex + ts && my >= ty && my <= ty + ts) return CLICK_ADD;
         }
         return CLICK_NONE;
