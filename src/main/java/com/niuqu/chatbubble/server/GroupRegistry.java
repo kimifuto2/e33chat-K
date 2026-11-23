@@ -670,11 +670,13 @@ public final class GroupRegistry {
         if (g == null || actor == null) return;
         if (g.creator == null || !g.creator.equals(actor.getUUID())) {
             log("transfer denied | actor is not creator | actor=" + name(actor) + " | " + g);
+            actor.sendSystemMessage(net.minecraft.network.chat.Component.translatable("e33chat.group.transfer_denied"));
             return;
         }
         UUID target = payload.target();
         if (target == null || target.equals(g.creator) || !g.hasMember(target)) {
             log("transfer denied | target invalid | actor=" + name(actor) + " | target=" + target);
+            actor.sendSystemMessage(net.minecraft.network.chat.Component.translatable("e33chat.group.transfer_denied"));
             return;
         }
         g.creator = target;

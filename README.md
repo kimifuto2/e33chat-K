@@ -1,9 +1,9 @@
 # E33Chat · Minecraft 26.3 Fabric 版
 
 > **本分支：`mc26.3` · Minecraft 26.3（26.x 移植线）**
-> 产物：**`e33chat-Fabric-26.3-3.2.2.jar`**（767,633 字节 / ≈749 KiB） · 模组版本 **3.2.2**
+> 产物：**`e33chat-Fabric-26.3-3.2.2.jar`**（768,898 字节 / ≈749 KiB） · 模组版本 **3.2.2**
 >
-> 本轮 3.2.2：修复 HUD 红点、浅色主题 HUD 图标/提示色、输入框补全预览后缀配色；群聊持久化只读保护、Paper 迁移顺序与邀请过期加固。3.2.1 的图片载荷 8192、群主权限、`/e33chat group list|delete`、媒体/网络上限等审查修补继续保留。
+> 本轮 3.2.2：修复 HUD 红点、浅色主题 HUD 图标/提示色、输入框补全预览后缀配色；补上群主转让的服务端能力校验、二次确认提示与拒绝回执；完成群主转让服务端能力校验/二次确认提示/拒绝回执；群聊持久化只读保护、Paper 迁移顺序与邀请过期加固。3.2.1 的图片载荷 8192、群主权限、`/e33chat group list|delete`、媒体/网络上限等审查修补继续保留。
 > 仓库：[kimifuto2/e33chat-K](https://github.com/kimifuto2/e33chat-K) · 上游：[E33EPUS/E33Chat](https://github.com/E33EPUS/E33Chat)（MIT）
 >
 > 在 1.21.11 移植/增强版的基础上，把客户端**移植到 Minecraft 26.3**：功能集与 `main` 分支同源，主要差异在构建链与 26.x 平台 API（见「26.x 移植说明」）。
@@ -16,9 +16,9 @@
 
 | 分支 | Minecraft | 定位 | 产物 jar（3.2.2） | 大小 |
 |---|---|---|---|---|
-| `main` | 1.21.11 | 稳定线 | `e33chat-Fabric-1.21.11-3.2.2.jar` | 765,415 B |
-| **`mc26.3`**（本分支） | 26.3 | 26.x 移植线 | `e33chat-Fabric-26.3-3.2.2.jar` | 767,633 B |
-| `mc26.2` | 26.2 | 26.x 移植线 | `e33chat-Fabric-26.2-3.2.2.jar` | 767,658 B |
+| `main` | 1.21.11 | 稳定线 | `e33chat-Fabric-1.21.11-3.2.2.jar` | 766,709 B |
+| **`mc26.3`**（本分支） | 26.3 | 26.x 移植线 | `e33chat-Fabric-26.3-3.2.2.jar` | 768,898 B |
+| `mc26.2` | 26.2 | 26.x 移植线 | `e33chat-Fabric-26.2-3.2.2.jar` | 768,923 B |
 
 > 三个分支都在 **<https://github.com/kimifuto2/e33chat-K>** 下。**26.x 移植线**指 Mojang 改用年份版本号之后的版本，构建链与 1.21.11 差异很大（Java 25 / Gradle 9.8+ / Loom 1.19.3 / **不再混淆**）；`mc26.2` 与本分支环境基本相同，只有 Minecraft / Fabric API / 输入体系（GLFW vs SDL）不同（见「26.x 移植说明」最后一节）。
 
@@ -154,7 +154,7 @@ dependencies {
 
 ## 3.0.x 版本说明（相对上游 2.4.2）
 
-当前版本 **3.2.2**：修复 HUD 红点、浅色主题 HUD 提示色、输入框补全预览后缀色；完成 Paper 只读保护/迁移顺序/邀请过期与 Fabric 停服保存等群聊持久化修补。此前的 3.2.1 UI 收尾与通道机制、3.2.0 主题系统、3.1.x 群聊/玩家互动动作等改动继续保留。相对上游 2.4.2，本版除完成 1.21.11 → 26.3 的移植外，还包含以下增强：
+当前版本 **3.2.2**：修复 HUD 红点、浅色主题 HUD 提示色、输入框补全预览后缀色；完成 Paper 只读保护/迁移顺序/邀请过期与 Fabric 停服保存等群聊持久化修补；群主转让增加服务端能力校验、二次确认提示与拒绝回执。此前的 3.2.1 UI 收尾与通道机制、3.2.0 主题系统、3.1.x 群聊/玩家互动动作等改动继续保留。相对上游 2.4.2，本版除完成 1.21.11 → 26.3 的移植外，还包含以下增强：
 
 | 类别 | 内容 |
 |---|---|
@@ -325,8 +325,8 @@ gradle build
 
 | 文件 | 大小 |
 |---|---|
-| `build/libs/e33chat-Fabric-26.3-3.2.2.jar` | 767,633 B |
-| `build/libs/e33chat-Fabric-26.3-3.2.2-sources.jar` | 531,584 B |
+| `build/libs/e33chat-Fabric-26.3-3.2.2.jar` | 768,898 B |
+| `build/libs/e33chat-Fabric-26.3-3.2.2-sources.jar` | 532,671 B |
 
 ---
 
@@ -340,7 +340,7 @@ gradle build
 | paper-api 坐标 | `io.papermc.paper:paper-api:26.3.build.222-stable`（`compileOnly`） |
 | `paper-plugin.yml` 的 `api-version` | **`'26.3'`** |
 | 产物 | `paper-plugin/build/libs/E33ChatPaper-26.3-3.2.2.jar` |
-| 大小 | **78,242 B**（含 P3 图片消息中继） |
+| 大小 | **78,314 B**（含 P3 图片消息中继） |
 | 验证 | 已在 **Paper 26.3 build 222** 真机加载通过 |
 | 作用 | 引用跨玩家同步（C2S `e33chat:quote_sync` → S2C `e33chat:chat_meta` 广播）+ @提及同步（`AsyncChatEvent` 解析 `@名字`） |
 

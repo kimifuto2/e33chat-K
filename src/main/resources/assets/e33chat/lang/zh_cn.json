@@ -32,7 +32,8 @@
   "e33chat.config.custom_accent": "自定义强调色 (HEX)",
   "e33chat.config.custom_accent.desc": "输入 #RRGGBB 覆盖强调色（留空用预设）",
   "e33chat.config.custom_panel_bg": "自定义面板底色 (HEX)",
-  "e33chat.config.custom_panel_bg.desc": "输入 #RRGGBB 覆盖面板背景色（留空用主题默认）",  "e33chat.config.enabled": "启用模组",
+  "e33chat.config.custom_panel_bg.desc": "输入 #RRGGBB 覆盖面板背景色（留空用主题默认）",
+  "e33chat.config.enabled": "启用模组",
   "e33chat.config.enabled.desc": "开启或关闭自定义聊天界面",
   "e33chat.config.red_dot": "红点提示",
   "e33chat.config.red_dot.desc": "有未读消息时在聊天图标上显示红点",
@@ -374,5 +375,11 @@
   "e33chat.group.invite.sent": "已邀请 %s 加入群聊【%s】",
   "e33chat.group.invite.denied": "只有群主可以邀请玩家",
   "e33chat.config.group_chat_enabled": "群聊",
-  "e33chat.config.group_chat_enabled.desc": "侧边栏搜索框右侧显示「+」新建群聊；群消息全部经服务端中继（服务端也要装 E33Chat）"
+  "e33chat.config.group_chat_enabled.desc": "侧边栏搜索框右侧显示「+」新建群聊；群消息全部经服务端中继（服务端也要装 E33Chat）",
+  "e33chat.group.settings.transfer_click_again": "再点一次「确认转让?」执行",
+  "e33chat.group.settings.transfer_waiting": "已发送转让请求，等待服务器确认…",
+  "e33chat.group.settings.transfer_done": "群主已转让",
+  "e33chat.group.settings.transfer_no_response": "服务器未确认转让，请确认服务端已更新到 3.2.2+",
+  "e33chat.group.settings.transfer_unsupported": "服务端未启用群主转让（需 3.2.2+）",
+  "e33chat.group.transfer_denied": "转让失败：只有群主可以把群主转让给群内成员"
 }

@@ -197,7 +197,7 @@ $env:JAVA_HOME = 'C:\BianChengJA\JDK\JDK25'   # paper-api 26.x 的 class 主版�
 & 'C:\AI\ds harness\工作区\聊天mod移植1.21.11\gradle-dist\gradle-9.8.2\bin\gradle.bat' --no-daemon --console=plain build
 ```
 
-产物：`build/libs/E33ChatPaper-26.3-3.2.2.jar`（**78,242 字节**，`paper-api` 是 `compileOnly`，不打进 jar）。
+产物：`build/libs/E33ChatPaper-26.3-3.2.2.jar`（**78,314 字节**，`paper-api` 是 `compileOnly`，不打进 jar）。
 
 | 项目 | 值 |
 |---|---|
