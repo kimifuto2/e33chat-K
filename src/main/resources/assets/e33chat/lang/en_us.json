@@ -32,7 +32,8 @@
   "e33chat.config.custom_accent": "Custom Accent (HEX)",
   "e33chat.config.custom_accent.desc": "Enter #RRGGBB to override the accent (blank = preset)",
   "e33chat.config.custom_panel_bg": "Custom Panel BG (HEX)",
-  "e33chat.config.custom_panel_bg.desc": "Enter #RRGGBB to override the panel background (blank = theme default)",  "e33chat.config.enabled": "Enable Mod",
+  "e33chat.config.custom_panel_bg.desc": "Enter #RRGGBB to override the panel background (blank = theme default)",
+  "e33chat.config.enabled": "Enable Mod",
   "e33chat.config.enabled.desc": "Turn the custom chat overlay on or off",
   "e33chat.config.red_dot": "Red Dot",
   "e33chat.config.red_dot.desc": "Show a red dot on the chat icon for unread messages",
@@ -374,5 +375,11 @@
   "e33chat.group.invite.sent": "Invitation sent to %s for [%s]",
   "e33chat.group.invite.denied": "Only the group owner can invite players",
   "e33chat.config.group_chat_enabled": "Group Chat",
-  "e33chat.config.group_chat_enabled.desc": "Show the \"+\" button next to the sidebar search box for creating group chats; all group messages are relayed by the server (the server also needs E33Chat)"
+  "e33chat.config.group_chat_enabled.desc": "Show the \"+\" button next to the sidebar search box for creating group chats; all group messages are relayed by the server (the server also needs E33Chat)",
+  "e33chat.group.settings.transfer_click_again": "Click \"Confirm transfer?\" again to execute",
+  "e33chat.group.settings.transfer_waiting": "Transfer request sent; waiting for the server…",
+  "e33chat.group.settings.transfer_done": "Ownership transferred",
+  "e33chat.group.settings.transfer_no_response": "Server did not confirm the transfer; update the server to 3.2.2+",
+  "e33chat.group.settings.transfer_unsupported": "Server does not support ownership transfer (3.2.2+ required)",
+  "e33chat.group.transfer_denied": "Transfer failed: only the owner can transfer ownership to a member."
 }

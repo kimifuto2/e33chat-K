@@ -81,6 +81,8 @@ public class GroupSettingsScreen extends GroupModal {
     private static final int ACT_DONE = 2;
 
     private static final long CONFIRM_MS = 4000L;
+    private static final long TRANSFER_ACK_TIMEOUT_MS = 3500L;
+    private static final long TRANSFER_STATUS_MS = 8000L;
 
     private final UUID groupId;
 
@@ -104,6 +106,14 @@ public class GroupSettingsScreen extends GroupModal {
     private final List<int[]> transferRects = new ArrayList<>();
     private UUID transferTarget;
     private long transferConfirmAt;
+    /** 等待服务端确认的转让目标（服务端 GroupSync 回来后清理）。 */
+    private UUID transferPendingTarget;
+    private long transferPendingAt;
+    /** 群设置页顶部短暂显示的转让状态（translation key）。 */
+    private String transferStatusKey;
+    private long transferStatusAt;
+    /** 与 transferRects 一一对应的真实 UUID：避免滚动/搜索后按下标取错人。 */
+    private final List<UUID> transferMemberIds = new ArrayList<>();
     /** 底部按钮命中矩形：[x, y, w, h, action]。渲染与点击共用同一份算式。 */
     private final List<int[]> footerBtns = new ArrayList<>();
 
@@ -318,6 +328,20 @@ public class GroupSettingsScreen extends GroupModal {
     }
 
     /** 我是不是这个群的创建者（创建者能邀请/解散，其它成员只能退出）。 */
+    private void setTransferStatus(String key) {
+        transferStatusKey = key;
+        transferStatusAt = Util.getMillis();
+    }
+
+    private String transferStatus() {
+        if (transferStatusKey == null) return null;
+        if (Util.getMillis() - transferStatusAt > TRANSFER_STATUS_MS) {
+            transferStatusKey = null;
+            return null;
+        }
+        return transferStatusKey;
+    }
+
     private boolean isOwner(GroupStore.Group group) {
         UUID self = GroupStore.currentSelf();
         return group != null && self != null && self.equals(group.creator());
@@ -388,8 +412,24 @@ public class GroupSettingsScreen extends GroupModal {
 
         GroupUi.title(g, tr, Component.literal(group.displayName()), cardX + cardW / 2,
             cardY + 8, c.textPrimary());
-        GroupUi.title(g, tr,
-            Component.translatable("e33chat.group.settings.member_count", group.size()),
+        boolean ownerNow = isOwner(group);
+        if (transferPendingTarget != null) {
+            long now = Util.getMillis();
+            if (transferPendingTarget.equals(group.creator())) {
+                transferPendingTarget = null;
+                setTransferStatus("e33chat.group.settings.transfer_done");
+            } else if (now - transferPendingAt > TRANSFER_ACK_TIMEOUT_MS) {
+                transferPendingTarget = null;
+                setTransferStatus("e33chat.group.settings.transfer_no_response");
+            }
+        }
+        if (ownerNow && !GroupStore.supportsTransfer() && transferStatus() == null) {
+            setTransferStatus("e33chat.group.settings.transfer_unsupported");
+        }
+        String transferStatus = transferStatus();
+        GroupUi.title(g, tr, transferStatus == null
+                ? Component.translatable("e33chat.group.settings.member_count", group.size())
+                : Component.translatable(transferStatus),
             cardX + cardW / 2, cardY + 20, c.textMuted());
         GroupUi.divider(g, cardX + 8, cardY + TITLE_H, cardW - 16);
 
@@ -424,7 +464,9 @@ public class GroupSettingsScreen extends GroupModal {
         clampScroll();
         kickRects.clear();
         transferRects.clear();
-        boolean owner = isOwner(group);
+        transferMemberIds.clear();
+        boolean owner = ownerNow;
+        boolean canTransfer = GroupStore.supportsTransfer();
         List<GroupStore.Member> members = members();
         List<GroupStore.Member> shown = filteredMembers();
         UUID self = GroupStore.currentSelf();
@@ -446,13 +488,13 @@ public class GroupSettingsScreen extends GroupModal {
             if (isCreator) label = label + Component.translatable("e33chat.group.settings.creator_tag").getString();
             int nameX = cardX + 32;
             int actionW = 40;
-            int transferW = owner && !isSelf && !isCreator ? 40 : 0;
+            int transferW = owner && canTransfer && !isSelf && !isCreator ? 40 : 0;
             int reserve = (owner ? actionW : 0) + (transferW > 0 ? transferW + 4 : 0) + 8;
             g.drawText(tr,
                 GroupUi.ellipsize(tr, label, cardX + cardW - 12 - reserve - nameX),
                 nameX, y + (ROW_H - tr.lineHeight) / 2 + 1, GroupUi.a(c.textPrimary()), false);
 
-            if (owner && !isSelf && !isCreator) {
+            if (owner && canTransfer && !isSelf && !isCreator) {
                 int tx = cardX + cardW - 12 - actionW - transferW - 4;
                 int ky = y + (ROW_H - 14) / 2;
                 boolean confirming = transferTarget != null && transferTarget.equals(m.uuid())
@@ -463,7 +505,9 @@ public class GroupSettingsScreen extends GroupModal {
                         ? "e33chat.group.settings.transfer_confirm"
                         : "e33chat.group.settings.transfer"),
                     th, false, true, true);
-                transferRects.add(new int[]{tx, ky, transferW, 14, i});
+                int rid = transferMemberIds.size();
+                transferMemberIds.add(m.uuid());
+                transferRects.add(new int[]{tx, ky, transferW, 14, rid});
             }
 
             if (owner && !isSelf && !isCreator) {
@@ -578,20 +622,30 @@ public class GroupSettingsScreen extends GroupModal {
             }
             for (int[] r : transferRects) {
                 if (mx >= r[0] && mx <= r[0] + r[2] && my >= r[1] && my <= r[1] + r[3]) {
-                    List<GroupStore.Member> shown = filteredMembers();
-                    if (r[4] < 0 || r[4] >= shown.size()) return true;
-                    GroupStore.Member m = shown.get(r[4]);
+                    UUID target = r[4] >= 0 && r[4] < transferMemberIds.size()
+                        ? transferMemberIds.get(r[4]) : null;
+                    if (target == null) return true;
                     long now = Util.getMillis();
-                    if (transferTarget != null && transferTarget.equals(m.uuid())
+                    if (transferTarget != null && transferTarget.equals(target)
                         && now - transferConfirmAt <= CONFIRM_MS) {
-                        GroupStore.transfer(groupId, m.uuid());
+                        boolean sent = GroupStore.transfer(groupId, target);
                         ChatMessageStore.debugLog(() -> "[e33chat] group transfer requested | "
-                            + groupId + " | target=" + m.uuid());
+                            + groupId + " | target=" + target + " | sent=" + sent);
                         transferTarget = null;
                         transferConfirmAt = 0L;
+                        if (sent) {
+                            transferPendingTarget = target;
+                            transferPendingAt = now;
+                            setTransferStatus("e33chat.group.settings.transfer_waiting");
+                        } else {
+                            setTransferStatus("e33chat.group.settings.transfer_unsupported");
+                        }
                     } else {
-                        transferTarget = m.uuid();
+                        transferTarget = target;
                         transferConfirmAt = now;
+                        setTransferStatus(GroupStore.supportsTransfer()
+                            ? "e33chat.group.settings.transfer_click_again"
+                            : "e33chat.group.settings.transfer_unsupported");
                     }
                     return true;
                 }
