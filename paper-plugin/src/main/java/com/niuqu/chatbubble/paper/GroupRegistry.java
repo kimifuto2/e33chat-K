@@ -716,9 +716,15 @@ final class GroupRegistry {
     static synchronized void transfer(Player actor, GroupInbound.Transfer payload) {
         Group g = byId(payload == null ? null : payload.groupId());
         if (g == null || actor == null) return;
-        if (g.creator() == null || !g.creator().equals(actor.getUniqueId())) return;
+        if (g.creator() == null || !g.creator().equals(actor.getUniqueId())) {
+            actor.sendMessage("Transfer failed: only the owner can transfer ownership.");
+            return;
+        }
         UUID target = payload.target();
-        if (target == null || target.equals(g.creator()) || !g.hasMember(target)) return;
+        if (target == null || target.equals(g.creator()) || !g.hasMember(target)) {
+            actor.sendMessage("Transfer failed: target must be a current member.");
+            return;
+        }
         g.creator = target;
         g.ownerLastSeen = System.currentTimeMillis();
         pendingInvites.remove(g.id());

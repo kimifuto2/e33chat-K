@@ -193,7 +193,7 @@ $env:JAVA_TOOL_OPTIONS = '-Dhttp.proxyHost=127.0.0.1 -Dhttp.proxyPort=7899 -Dhtt
 & 'C:\AI\ds harness\工作区\聊天mod移植1.21.11\gradle-dist\gradle-9.5.1\bin\gradle.bat' --no-daemon --console=plain build
 ```
 
-产物：`build/libs/E33ChatPaper-1.21.11-3.2.2.jar`（**78,249 字节**，`paper-api` 是 `compileOnly`，不打进 jar）。
+产物：`build/libs/E33ChatPaper-1.21.11-3.2.2.jar`（**78,321 字节**，`paper-api` 是 `compileOnly`，不打进 jar）。
 （26.3 / 26.2 分支的同名工程分别产出 `E33ChatPaper-26.3-3.2.2.jar` / `E33ChatPaper-26.2-3.2.2.jar`，
 它们是**同一套** `src/main/java`，只有 `build.gradle` 的 paper-api 坐标、JDK 版本与
 `paper-plugin.yml` 的 `api-version` 不同。）

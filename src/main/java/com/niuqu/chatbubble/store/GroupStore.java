@@ -213,6 +213,18 @@ public final class GroupStore {
         }
     }
 
+    /** 服务端是否声明支持群主转让（旧服务端没有 group_transfer 通道）。
+     *  UI 只在这里为 true 时显示转让按钮；点击后再检查一次，避免服务端刚好没注册。 */
+    public static boolean supportsTransfer() {
+        try {
+            MinecraftClient mc = MinecraftClient.getInstance();
+            if (mc != null && mc.getServer() != null) return true;
+            return ClientPlayNetworking.canSend(GroupTransferPayload.ID);
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
     public static synchronized List<Group> groups() {
         return new ArrayList<>(groups.values());
     }
@@ -558,18 +570,21 @@ public final class GroupStore {
         }
     }
 
-    public static void transfer(UUID groupId, UUID target) {
-        if (groupId == null || target == null) return;
-        if (!available()) {
-            ChatMessageStore.debugLog("[e33chat] group_transfer skipped | server has no group support");
-            return;
+    /** 发送转让请求；返回 false 说明服务端没有宣告 group_transfer（旧服务端）。 */
+    public static boolean transfer(UUID groupId, UUID target) {
+        if (groupId == null || target == null) return false;
+        if (!supportsTransfer()) {
+            ChatMessageStore.debugLog("[e33chat] group_transfer unsupported by server");
+            return false;
         }
         try {
             ClientPlayNetworking.send(new GroupTransferPayload(groupId.toString(), target));
             ChatMessageStore.debugLog(() -> "[e33chat] group_transfer send | group=" + groupId
                 + " | target=" + target);
+            return true;
         } catch (Throwable t) {
             ChatMessageStore.debugLog("[e33chat] group_transfer send failed | " + t);
+            return false;
         }
     }
 

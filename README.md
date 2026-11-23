@@ -1,9 +1,9 @@
 # E33Chat · Minecraft 1.21.11 Fabric 版
 
 > **本分支：`main` · Minecraft 1.21.11（稳定线）**
-> 产物：**`e33chat-Fabric-1.21.11-3.2.2.jar`**（765,415 字节 / ≈747 KiB） · 模组版本 **3.2.2**
+> 产物：**`e33chat-Fabric-1.21.11-3.2.2.jar`**（766,709 字节 / ≈747 KiB） · 模组版本 **3.2.2**
 >
-> 本轮 3.2.2：修复 HUD 红点、浅色主题 HUD 图标/提示色、输入框补全预览后缀配色；群聊持久化只读保护、Paper 迁移顺序与邀请过期加固。3.2.1 的图片载荷 8192、群主权限、`/e33chat group list|delete`、媒体/网络上限等审查修补继续保留。
+> 本轮 3.2.2：修复 HUD 红点、浅色主题 HUD 图标/提示色、输入框补全预览后缀配色；补上群主转让的服务端能力校验、二次确认提示与拒绝回执；完成群主转让服务端能力校验/二次确认提示/拒绝回执；群聊持久化只读保护、Paper 迁移顺序与邀请过期加固。3.2.1 的图片载荷 8192、群主权限、`/e33chat group list|delete`、媒体/网络上限等审查修补继续保留。
 > 仓库：[kimifuto2/e33chat-K](https://github.com/kimifuto2/e33chat-K) · 上游：[E33EPUS/E33Chat](https://github.com/E33EPUS/E33Chat)（MIT）
 >
 > 基于上游的 **1.21.1 Fabric 移植**，并在其上做了大量功能增强与缺陷修复：在保留原作者聊天界面风格的基础上，补齐了上游没有的交互与通知能力。
@@ -16,9 +16,9 @@
 
 | 分支 | Minecraft | 定位 | 产物 jar（各分支最新） | 大小 |
 |---|---|---|---|---|
-| **`main`**（本分支） | 1.21.11 | 稳定线 | `e33chat-Fabric-1.21.11-3.2.2.jar` | 765,415 B |
-| `mc26.3` | 26.3 | 26.x 移植线 | `e33chat-Fabric-26.3-3.2.2.jar` | 767,633 B |
-| `mc26.2` | 26.2 | 26.x 移植线 | `e33chat-Fabric-26.2-3.2.2.jar` | 767,658 B |
+| **`main`**（本分支） | 1.21.11 | 稳定线 | `e33chat-Fabric-1.21.11-3.2.2.jar` | 766,709 B |
+| `mc26.3` | 26.3 | 26.x 移植线 | `e33chat-Fabric-26.3-3.2.2.jar` | 768,898 B |
+| `mc26.2` | 26.2 | 26.x 移植线 | `e33chat-Fabric-26.2-3.2.2.jar` | 768,923 B |
 
 > 三个分支都在 **<https://github.com/kimifuto2/e33chat-K>** 下。`mc26.3` / `mc26.2` 是 **26.x 移植线**（Mojang 年份版本号），构建链与 1.21.11 差异很大（Java 25 / Gradle 9.8+ / Loom 1.19.3 / 不再混淆），详见对应分支 README 的「26.x 移植说明」；**本分支（`main`）只针对 1.21.11**。
 
@@ -65,7 +65,7 @@
 
 ## 3.x 版本说明（相对上游 2.4.2）
 
-当前版本 **3.2.2**：修复 HUD 红点、浅色主题 HUD 提示色、输入框补全预览后缀色；完成 Paper 只读保护/迁移顺序/邀请过期与 Fabric 停服保存等群聊持久化修补。此前的 3.2.1 UI 收尾与通道机制、3.2.0 主题系统、3.1.x 群聊/玩家互动动作等改动继续保留。相对上游 2.4.2，本版除完成 1.21.11 Fabric 移植外，还包含以下增强：
+当前版本 **3.2.2**：修复 HUD 红点、浅色主题 HUD 提示色、输入框补全预览后缀色；完成 Paper 只读保护/迁移顺序/邀请过期与 Fabric 停服保存等群聊持久化修补；群主转让增加服务端能力校验、二次确认提示与拒绝回执。此前的 3.2.1 UI 收尾与通道机制、3.2.0 主题系统、3.1.x 群聊/玩家互动动作等改动继续保留。相对上游 2.4.2，本版除完成 1.21.11 Fabric 移植外，还包含以下增强：
 
 | 类别 | 内容 |
 |---|---|
@@ -272,8 +272,8 @@ java.lang.IllegalStateException: Cannot register channel. Too many channel regis
 
 | 文件 | 大小 |
 |---|---|
-| `build/libs/e33chat-Fabric-1.21.11-3.2.2.jar` | 765,415 B |
-| `build/libs/e33chat-Fabric-1.21.11-3.2.2-sources.jar` | 531,239 B |
+| `build/libs/e33chat-Fabric-1.21.11-3.2.2.jar` | 766,709 B |
+| `build/libs/e33chat-Fabric-1.21.11-3.2.2-sources.jar` | 532,376 B |
 
 ---
 
@@ -285,7 +285,7 @@ java.lang.IllegalStateException: Cannot register channel. Too many channel regis
 |---|---|
 | 目标服务端 | Paper 1.21.11 |
 | 产物 | `paper-plugin/build/libs/E33ChatPaper-1.21.11-3.2.2.jar` |
-| 大小 | **78,249 B**（含 P3 图片消息中继） |
+| 大小 | **78,321 B**（含 P3 图片消息中继） |
 | 作用 | 引用同步（C2S `e33chat:quote_sync` → S2C `e33chat:chat_meta` 广播）+ @提及同步（`AsyncChatEvent` 解析 `@名字`） |
 
 线格式与 Fabric 侧逐字节一致（34 项离线校验全通过），客户端无需任何改动；字段表与构建方式见 [`paper-plugin/README.md`](paper-plugin/README.md)。
