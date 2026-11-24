@@ -55,7 +55,9 @@ public class ChatInputSuggestorMixin {
         if (net.minecraft.client.Minecraft.getInstance().gui.screen() instanceof ChatBubbleScreen) {
             if (!e33chat$usageBoxDrawn) {
                 int lines = Math.max(1, commandUsage == null ? 1 : commandUsage.size());
-                RoundRectRenderer.fill(UiCanvas.of(g), x1, y1, x2, y1 + 12 * lines, 6f, color);
+                // 原版从最下面一行开始画，越往后的行 y 越小；圆角底要向上扩展。
+                int top = y1 - 12 * (lines - 1);
+                RoundRectRenderer.fill(UiCanvas.of(g), x1, top, x2, y1 + 12, 6f, color);
                 e33chat$usageBoxDrawn = true;
             }
             return;
