@@ -1,12 +1,16 @@
 package com.niuqu.chatbubble.mixin;
 
 import com.niuqu.chatbubble.ChatBubbleScreen;
+import com.niuqu.chatbubble.render.RoundRectRenderer;
+import com.niuqu.chatbubble.render.UiCanvas;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.CommandSuggestions;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.Font;
 import net.minecraft.network.chat.Style;
 import net.minecraft.network.chat.TextColor;
+import net.minecraft.util.FormattedCharSequence;
+import java.util.List;
 import com.niuqu.chatbubble.render.Appearance;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.client.renderer.Rect2i;
@@ -22,6 +26,9 @@ public class ChatInputSuggestorMixin {
 
     @Shadow private int commandUsageWidth;
     @Shadow private int commandUsagePosition;
+    @Shadow private List<FormattedCharSequence> commandUsage;
+    /** 当前帧是否已经画过合并后的圆角用法底；多行 fill 只取第一次。 */
+    private boolean e33chat$usageBoxDrawn;
 
     // 注意：这里**不能**再取消 extractRenderState。
     // 26.x 的 ChatInputSuggestorMixin 曾经 @Inject(HEAD, cancellable) 把
@@ -33,10 +40,27 @@ public class ChatInputSuggestorMixin {
     /** 命令用法/报错提示行：上移到输入框上方，并去掉像素字体阴影。 */
     @Inject(method = "extractUsage", at = @At("HEAD"))
     private void e33chat$liftUsage(GuiGraphicsExtractor g, CallbackInfo ci) {
+        e33chat$usageBoxDrawn = false;
         if (net.minecraft.client.Minecraft.getInstance().gui.screen() instanceof ChatBubbleScreen s) {
             g.pose().pushMatrix();
             g.pose().translate(0, -s.commandHintLift());
         }
+    }
+
+    /** 原版每行各画一条矩形底；合并成覆盖全部提示行的单个圆角底。 */
+    @Redirect(method = "extractUsage",
+        at = @At(value = "INVOKE",
+            target = "Lnet/minecraft/client/gui/GuiGraphicsExtractor;fill(IIIII)V"))
+    private void e33chat$roundedUsageBox(GuiGraphicsExtractor g, int x1, int y1, int x2, int y2, int color) {
+        if (net.minecraft.client.Minecraft.getInstance().gui.screen() instanceof ChatBubbleScreen) {
+            if (!e33chat$usageBoxDrawn) {
+                int lines = Math.max(1, commandUsage == null ? 1 : commandUsage.size());
+                RoundRectRenderer.fill(UiCanvas.of(g), x1, y1, x2, y1 + 12 * lines, 6f, color);
+                e33chat$usageBoxDrawn = true;
+            }
+            return;
+        }
+        g.fill(x1, y1, x2, y2, color);
     }
 
     @Inject(method = "extractUsage", at = @At("RETURN"))
