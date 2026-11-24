@@ -176,6 +176,8 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
 
     private CommandSuggestions commandSuggestions;
     private static int inputX, inputY;
+    /** 输入框文字区宽度（视觉外框还要加光标/展开按钮预留与描边）。 */
+    private static int inputBoxW;
 
     public static int getInputX() { return inputX; }
     public static int getInputY() { return inputY; }
@@ -484,6 +486,7 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
         int sendX = panelX + panelW - PAD - ICON_S + 2;
         int inputW = inputFieldWidth(inputX, sendX);
 
+        inputBoxW = inputW;
         input = new EditBox(font, inputX, ibY + 3, inputW, INPUT_H, Component.literal(""));
         // 复制整条图片消息时会有多个 [[CICode]] URL；256 会在粘贴时截掉第 5 张之后的图片。
         input.setMaxLength(4096);
@@ -676,6 +679,7 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
         boolean widthChanged = input.getWidth() != newInputW;
         inputX = newInputX;
         inputY = ibY;
+        inputBoxW = newInputW;
         input.setWidth(newInputW);
         input.setX(newInputX);
         input.setY(ibY + 3);
@@ -3918,18 +3922,11 @@ boolean showAvatar = !(ChatBubbleClientSetup.config().hideRepeatedAvatars() != n
         if (commandSuggestions == null) return;
         com.niuqu.chatbubble.mixin.ChatInputSuggestorAccessor acc = (com.niuqu.chatbubble.mixin.ChatInputSuggestorAccessor) commandSuggestions;
         int fieldX = input.getX();
-        int visualW = input.getWidth() + INPUT_CURSOR_RESERVE + INPUT_BOX_OUTSET * 2;
-        int usageW = visualW;
-        java.util.List<net.minecraft.util.FormattedCharSequence> usageLines = acc.getCommandUsage();
-        if (usageLines != null) {
-            for (net.minecraft.util.FormattedCharSequence line : usageLines) {
-                if (line != null) usageW = Math.max(usageW, font.width(line) + 8);
-            }
-        }
-        usageW = Math.min(panelW, usageW);
-        // 用法提示整栏在聊天面板内居中。
-        acc.e33chat$setUsageX(panelX + (panelW - usageW) / 2);
-        acc.e33chat$setUsageWidth(usageW);
+        // 用法提示框与输入框视觉外框左右对齐：原版 fill 会从 x-1 画到 x+w+1，
+        // 所以 x 取外框左边 +1、w 取外框宽度 -2（等价于和输入框两边各留 1px）。
+        acc.e33chat$setUsageX(input.getX() - 1);
+        acc.e33chat$setUsageWidth(input.getWidth() + INPUT_CURSOR_RESERVE
+            + INPUT_EDITOR_RESERVE + 2);
         net.minecraft.client.gui.components.CommandSuggestions.SuggestionsList window = acc.getWindow();
         if (window == null) return;
         net.minecraft.client.renderer.Rect2i area = ((com.niuqu.chatbubble.mixin.SuggestionWindowAccessor) window).getArea();
