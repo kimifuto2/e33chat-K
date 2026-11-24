@@ -2,6 +2,7 @@ package com.niuqu.chatbubble.mixin;
 
 import com.niuqu.chatbubble.render.Appearance;
 import com.niuqu.chatbubble.render.ChatBubbleTheme;
+import com.niuqu.chatbubble.render.RoundRectRenderer;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.ChatInputSuggestor;
@@ -68,6 +69,28 @@ public class SuggestionWindowColorMixin {
             }
         }
         context.drawText(textRenderer, text, x, y, color, false);
+    }
+
+    /** 原版候选框由两条矩形 fill 拼成；换成覆盖整块列表的一个圆角底。 */
+    @Redirect(method = "render",
+        at = @At(value = "INVOKE",
+            target = "Lnet/minecraft/client/gui/DrawContext;fill(IIIII)V", ordinal = 0))
+    private void e33chat$roundedSuggestionBoxTop(DrawContext context, int x1, int y1, int x2, int y2, int color) {
+        if (area != null) {
+            RoundRectRenderer.fill(context, area.getX(), area.getY() - 1,
+                area.getX() + area.getWidth(), area.getY() + area.getHeight() + 1,
+                6f, color);
+        } else {
+            context.fill(x1, y1, x2, y2, color);
+        }
+    }
+
+    /** 第二条底部填充已经并入上面的圆角底，跳过。 */
+    @Redirect(method = "render",
+        at = @At(value = "INVOKE",
+            target = "Lnet/minecraft/client/gui/DrawContext;fill(IIIII)V", ordinal = 1))
+    private void e33chat$roundedSuggestionBoxBottom(DrawContext context, int x1, int y1, int x2, int y2, int color) {
+        // no-op: the first fill above covers the full rounded box
     }
 
     /** 在强调色底上对比度更高的白或黑（WCAG 相对亮度）。 */

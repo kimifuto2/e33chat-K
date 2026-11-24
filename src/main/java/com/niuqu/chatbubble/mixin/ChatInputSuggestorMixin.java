@@ -2,6 +2,7 @@ package com.niuqu.chatbubble.mixin;
 
 import com.niuqu.chatbubble.ChatBubbleScreen;
 import com.niuqu.chatbubble.render.Appearance;
+import com.niuqu.chatbubble.render.RoundRectRenderer;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
@@ -11,6 +12,8 @@ import net.minecraft.client.util.math.Rect2i;
 import net.minecraft.text.OrderedText;
 import net.minecraft.text.Style;
 import net.minecraft.text.TextColor;
+
+import java.util.List;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -26,6 +29,9 @@ public class ChatInputSuggestorMixin {
 
     @Shadow private int x;
     @Shadow private int width;
+    @Shadow private List<OrderedText> messages;
+    /** 当前帧是否已经画过合并后的圆角用法底；多行 fill 只取第一次。 */
+    private boolean e33chat$usageBoxDrawn;
 
     /** 原版命令高亮里「未被参数占用的文字」用的灰色样式（Formatting.GRAY）。 */
     @Shadow @Final private static Style INFO_STYLE;
@@ -58,10 +64,27 @@ public class ChatInputSuggestorMixin {
      */
     @Inject(method = "renderMessages", at = @At("HEAD"))
     private void e33chat$liftHintHead(DrawContext context, CallbackInfo ci) {
+        e33chat$usageBoxDrawn = false;
         if (owner instanceof ChatBubbleScreen s && s.commandHintLift() > 0) {
             context.getMatrices().pushMatrix();
             context.getMatrices().translate(0f, -s.commandHintLift());
         }
+    }
+
+    /** 原版每行各画一条矩形底；合并成覆盖全部提示行的单个圆角底。 */
+    @Redirect(method = "renderMessages",
+        at = @At(value = "INVOKE",
+            target = "Lnet/minecraft/client/gui/DrawContext;fill(IIIII)V"))
+    private void e33chat$roundedUsageBox(DrawContext context, int x1, int y1, int x2, int y2, int color) {
+        if (owner instanceof ChatBubbleScreen) {
+            if (!e33chat$usageBoxDrawn) {
+                int lines = Math.max(1, messages == null ? 1 : messages.size());
+                RoundRectRenderer.fill(context, x1, y1, x2, y1 + 12 * lines, 6f, color);
+                e33chat$usageBoxDrawn = true;
+            }
+            return;
+        }
+        context.fill(x1, y1, x2, y2, color);
     }
 
     @Inject(method = "renderMessages", at = @At("RETURN"))
