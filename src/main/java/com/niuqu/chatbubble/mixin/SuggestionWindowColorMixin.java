@@ -13,8 +13,10 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Constant;
+import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyConstant;
 import org.spongepowered.asm.mixin.injection.Redirect;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
  * 指令候选列表配色 + 选中行高亮（26.3）。
@@ -58,26 +60,29 @@ public class SuggestionWindowColorMixin {
         g.text(font, text, x, y, color, false);
     }
 
-    /** 原版候选框由两条矩形 fill 拼成；换成覆盖整块列表的一个圆角底。 */
+    /** 当前帧已处理的候选列表 fill 数：第一次画圆角底，其余滚动条/渐变 fill 一并跳过。 */
+    private int e33chat$bgFillCount;
+
+    @Inject(method = "extractRenderState", at = @At("HEAD"))
+    private void e33chat$resetRoundedBg(GuiGraphicsExtractor g, int mouseX, int mouseY, CallbackInfo ci) {
+        e33chat$bgFillCount = 0;
+    }
+
+    /** 原版候选框由多条矩形 fill 拼成；合并成覆盖整块列表的一个圆角底。 */
     @Redirect(method = "extractRenderState",
         at = @At(value = "INVOKE",
-            target = "Lnet/minecraft/client/gui/GuiGraphicsExtractor;fill(IIIII)V", ordinal = 0))
-    private void e33chat$roundedSuggestionBoxTop(GuiGraphicsExtractor g, int x1, int y1, int x2, int y2, int color) {
-        if (rect != null) {
+            target = "Lnet/minecraft/client/gui/GuiGraphicsExtractor;fill(IIIII)V"))
+    private void e33chat$roundedSuggestionBox(GuiGraphicsExtractor g, int x1, int y1, int x2, int y2, int color) {
+        if (rect == null) {
+            g.fill(x1, y1, x2, y2, color);
+            return;
+        }
+        if (e33chat$bgFillCount++ == 0) {
             RoundRectRenderer.fill(UiCanvas.of(g), rect.getX(), rect.getY() - 1,
                 rect.getX() + rect.getWidth(), rect.getY() + rect.getHeight() + 1,
                 6f, color);
-        } else {
-            g.fill(x1, y1, x2, y2, color);
         }
-    }
-
-    /** 第二条底部填充已经并入上面的圆角底，跳过。 */
-    @Redirect(method = "extractRenderState",
-        at = @At(value = "INVOKE",
-            target = "Lnet/minecraft/client/gui/GuiGraphicsExtractor;fill(IIIII)V", ordinal = 1))
-    private void e33chat$roundedSuggestionBoxBottom(GuiGraphicsExtractor g, int x1, int y1, int x2, int y2, int color) {
-        // no-op: the first fill above covers the full rounded box
+        // 后续 fill 是滚动提示/阴影，跳过；否则会把圆角切成直角。
     }
 
     private static int e33chat$baseTextColor() {
