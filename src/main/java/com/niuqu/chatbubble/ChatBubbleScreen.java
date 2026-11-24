@@ -170,9 +170,21 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
 
     private ChatInputSuggestor commandSuggestions;
     private static int inputX, inputY;
+    /** 输入框文字区宽度（视觉外框还要加光标/展开按钮预留与描边）。 */
+    private static int inputBoxW;
 
     public static int getInputX() { return inputX; }
     public static int getInputY() { return inputY; }
+
+    /** 用法/报错提示框的左边（原版 fill 会再从 x-1 开始画，所以这里少 1px）。 */
+    public static int commandUsageLeft() {
+        return inputX - 1;
+    }
+
+    /** 用法/报错提示框的宽度：与输入框视觉外框等宽（fill 会左右各多 1px）。 */
+    public static int commandUsageWidth() {
+        return inputBoxW + INPUT_CURSOR_RESERVE + INPUT_EDITOR_RESERVE + 2;
+    }
 
     /**
      * 指令候选窗的底边 Y：贴着输入框视觉外框的上沿、留 1px 间距。
@@ -492,6 +504,7 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
         int sendX = panelX + panelW - PAD - ICON_S + 2;
         int inputW = inputFieldWidth(inputX, sendX);
 
+        inputBoxW = inputW;
         chatField = new TextFieldWidget(textRenderer, inputX, ibY + 3, inputW, INPUT_H, Text.literal(""));
         // 复制整条图片消息时会有多个 [[CICode]] URL；256 会在粘贴时截掉第 5 张之后的图片。
         chatField.setMaxLength(4096);
@@ -692,6 +705,7 @@ public class ChatBubbleScreen extends ChatScreen implements GroupModal.Host {
         boolean widthChanged = chatField.getWidth() != newInputW;
         inputX = newInputX;
         inputY = ibY;
+        inputBoxW = newInputW;
         chatField.setWidth(newInputW);
         chatField.setX(newInputX);
         chatField.setY(ibY + 3);
@@ -3048,19 +3062,10 @@ boolean selDrag = textSelection.isDragActive();
         ChatInputSuggestorAccessor acc = (ChatInputSuggestorAccessor) commandSuggestions;
         int fieldX = chatField.getX();
         int fieldW = chatField.getWidth();
-        int visualW = fieldW + INPUT_CURSOR_RESERVE + INPUT_BOX_OUTSET * 2;
-        // 用法提示框至少和输入框视觉底框同宽；提示文字更长时按文字宽扩展，保证包住文字。
-        int usageW = visualW;
-        java.util.List<net.minecraft.text.OrderedText> usageLines = acc.getMessages();
-        if (usageLines != null) {
-            for (net.minecraft.text.OrderedText line : usageLines) {
-                if (line != null) usageW = Math.max(usageW, textRenderer.getWidth(line) + 8);
-            }
-        }
-        usageW = Math.min(panelW, usageW);
-        // 用法提示整栏在聊天面板内居中（右侧不能顶到面板边框、左侧留一大段空）。
-        acc.e33chat$setSuggestX(panelX + (panelW - usageW) / 2);
-        acc.e33chat$setSuggestWidth(usageW);
+        // 用法提示框与输入框视觉外框左右对齐；原版 fill 会从 x-1 画到 x+w+1，
+        // 所以 x 取输入框 x-1、宽度补上光标/展开预留与左右各 1px。
+        acc.e33chat$setSuggestX(fieldX - 1);
+        acc.e33chat$setSuggestWidth(fieldW + INPUT_CURSOR_RESERVE + INPUT_EDITOR_RESERVE + 2);
 
         ChatInputSuggestor.SuggestionWindow window = acc.getWindow();
         if (window == null) return;
