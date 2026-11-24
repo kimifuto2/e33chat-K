@@ -67,7 +67,15 @@ public class SuggestionWindowColorMixin {
                 int toward = base == 0 ? 0xFFFFFF : 0x000000;
                 int band = ChatBubbleTheme.mix(accent, toward, 0.5) & 0xFFFFFF;
                 int top = area.getY() + 12 * cell;
-                context.fill(area.getX(), top, area.getX() + area.getWidth(), top + 12, 0xFF000000 | band);
+                int rows = Math.max(1, area.getHeight() / 12);
+                int bandColor = 0xFF000000 | band;
+                if (cell == 0 || cell == rows - 1) {
+                    // 首/末行高亮条如果仍是方角，会盖住列表两端的圆角；这里跟着做圆角。
+                    RoundRectRenderer.fill(context, area.getX(), top,
+                        area.getX() + area.getWidth(), top + 12, 6f, bandColor);
+                } else {
+                    context.fill(area.getX(), top, area.getX() + area.getWidth(), top + 12, bandColor);
+                }
             }
         }
         context.drawText(textRenderer, text, x, y, color, false);
