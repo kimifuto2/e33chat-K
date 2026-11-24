@@ -153,8 +153,9 @@ public class ChatBubbleHudOverlay {
     }
 
 
+    /** 左下角图标与 [按键] 提示取主题主文字色；浅色主题不再复用偏橙的 quoteBar。 */
     private static int hintColor() {
-        return 0xFF000000 | (c().quoteBar() & 0xFFFFFF);
+        return 0xFF000000 | (c().nameColor() & 0xFFFFFF);
     }
 
     private static void drawIcon(UiCanvas g, int x, int y) {
@@ -165,6 +166,6 @@ public class ChatBubbleHudOverlay {
     private static void drawScaledTip(UiCanvas g, int x, int y, int disp) {
         Identifier tex = ChatBubbleScreen.iconTex("private_tip");
         com.niuqu.chatbubble.texture.ColoredTextureRenderer.drawTinted(g, tex, x, y, disp, disp,
-            (float) SRC_U, (float) SRC_V, SRC_S, SRC_S, 16, 16, hintColor());
+            (float) SRC_U, (float) SRC_V, SRC_S, SRC_S, 16, 16, 0xFFFFFFFF);
     }
 }
